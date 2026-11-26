@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}独立转写 · CallArchive{% endblock %}
+{% block content %}
+  <header class="console-header page-heading">
+    <h1 id="transcribe">独立转写</h1>
+    <a class="quiet" href="/">返回</a>
+  </header>
+  <form class="panel form" action="/workbench/transcription" method="post" enctype="multipart/form-data" aria-labelledby="transcribe">
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <input type="hidden" name="request_id" value="{{ request_id }}">
+    <label for="audio">录音文件</label>
+    <input id="audio" name="audio" type="file" accept=".wav,.mp3,.flac" required>
+    <label for="hotwords">热词（选填）</label>
+    <textarea id="hotwords" name="hotwords" rows="3" maxlength="10100" aria-describedby="hotwords-note"></textarea>
+    <small id="hotwords-note">每行填写一个常用人名、地名或术语。</small>
+    <label for="speaker_count">预计说话人数（选填）</label>
+    <input id="speaker_count" name="speaker_count" type="number" min="1" max="100" step="1">
+    <button type="submit">提交转写</button>
+  </form>
+  <section class="panel detail" aria-labelledby="history">
+    <h2 id="history">转写记录</h2>
+    {% if records["items"] %}
+      <ul class="history">
+      {% for item in records["items"] %}
+        <li><a href="/workbench/transcription/{{ item.id }}">{{ item.filename }}</a></li>
+      {% endfor %}
+      </ul>
+    {% else %}<p class="muted">暂无转写记录。</p>{% endif %}
+    {% if cursor or records.next_cursor %}
+      <nav class="paging" aria-label="转写记录分页">
+        {% if cursor %}<a href="/workbench/transcription">回到最新</a>{% endif %}
+        {% if records.next_cursor %}<a href="?cursor={{ records.next_cursor }}">更早的记录</a>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+{% endblock %}

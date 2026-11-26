@@ -1,0 +1,10 @@
+<dialog closedby="any" id="detail" aria-labelledby="detail-title">
+  <header class="detail-header"><h2 id="detail-title">话单详情</h2>
+    <form method="dialog" class="actions">
+      <button id="remove-detail" type="button" class="danger call-action" hidden>移除</button>
+      <button id="retry-detail" type="button" class="secondary retry-button call-action" disabled>重试</button>
+      {% set close_button_class = "secondary call-action" %}{% include "console_detail_close.html" %}
+    </form>
+  </header>
+  <div class="detail-body"><p id="detail-message" role="status"></p><div id="detail-data"></div></div>
+</dialog>

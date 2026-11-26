@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}转写详情 · CallArchive{% endblock %}
+{% block content %}
+  {% set labels = {"submitting": "提交待确认", "queued": "待转写", "running": "正在转写",
+     "succeeded": "转写完成", "failed": "转写失败", "needs_review": "需核对",
+     "expired": "结果已过期", "unavailable": "暂时无法获取状态"} %}
+  <a class="back" href="/workbench/transcription">返回转写记录</a>
+  <div class="page-heading">
+    <h1>{{ item.filename }}</h1>
+    <span class="state{% if status == 'succeeded' %} archived{% endif %}">{{ labels.get(status, status) }}</span>
+  </div>
+  <section class="panel detail">
+    {% if status not in ("expired", "submitting") %}
+      <audio controls preload="metadata" aria-label="原录音" src="/workbench/transcription/{{ item.id }}/audio"></audio>
+    {% endif %}
+    {% if status in ("queued", "running", "unavailable", "submitting") %}
+      <p><a class="quiet" href="/workbench/transcription/{{ item.id }}">刷新状态</a></p>
+    {% endif %}
+    {% if transcript is not none %}
+      <h2>转写文本</h2>
+      <p class="transcript">{{ transcript }}</p>
+      <a href="/workbench/transcription/{{ item.id }}/text" download>下载文本</a>
+    {% endif %}
+  </section>
+{% endblock %}

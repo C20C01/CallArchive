@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>运行日志</title>
+  <style nonce="{{ nonce }}">
+    :root {
+      color-scheme: light; font: 15px/1.5 system-ui, "Microsoft YaHei", sans-serif;
+      color: #13283a; background: #f2f6f7;
+      --line: #d2e0e5; --muted: #476174; --accent: #07635e; --wash: #e9f4f2;
+    }
+    html { scrollbar-gutter: stable; }
+    @supports not (scrollbar-gutter: stable) { html { overflow-y: scroll; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding-inline: clamp(16px, 4vw, 48px); }
+    main { max-inline-size: 62rem; margin-inline: auto; padding-block: 32px 52px; }
+    .console-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px 20px; margin-block-end: 22px;
+      padding: clamp(18px, 3vw, 28px);
+      border: 1px solid var(--line); border-radius: 16px;
+      background: linear-gradient(115deg, #e6f3ef, #f8fbfc);
+      font-family: Inter, "Microsoft YaHei", system-ui, sans-serif; font-size: medium;
+    }
+    .console-header h1 { margin: 0; font-size: clamp(1.5em, 4vw, 2.1em); line-height: 1.22; }
+    .return-home {
+      position: relative; display: inline-flex; align-items: center;
+      min-block-size: 40px; margin-inline-start: auto; padding: 7px 15px 7px 38px;
+      border: 1px solid #c5d9d5; border-radius: 999px;
+      background: radial-gradient(circle at 19px 50%, #e4f2ee 10px, transparent 10.5px), #fff;
+      color: var(--accent); font-size: .875em; font-weight: 650;
+      text-decoration: none; white-space: nowrap;
+    }
+    .return-home::before, .return-home::after {
+      content: ""; position: absolute; inset-block-start: 50%; inset-inline-start: 14px;
+    }
+    .return-home::before {
+      inline-size: 10px; border-block-start: 1.5px solid; transform: translateY(-50%);
+    }
+    .return-home::after {
+      inline-size: 6px; block-size: 6px; border-block-start: 1.5px solid;
+      border-inline-start: 1.5px solid; transform: translate(1px, -50%) rotate(-45deg);
+    }
+    .return-home:hover {
+      border-color: #8ab7ae;
+      background: radial-gradient(circle at 19px 50%, #d9ece7 10px, transparent 10.5px), #f8fcfb;
+    }
+    .return-home:active { border-color: var(--accent); }
+    a, summary { color: var(--accent); text-underline-offset: .2em; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .button, button {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 36px; padding: 6px 11px; border: 1px solid var(--line);
+      border-radius: 7px; background: white; color: var(--accent);
+      text-decoration: none; font: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .button[hidden] { display: none; }
+    .button:hover { background: var(--wash); }
+    button { background: var(--accent); border-color: var(--accent); color: white; }
+    button:hover { background: #084d4a; }
+    .signin, .log-console, .empty {
+      background: white; border: 1px solid var(--line); border-radius: 10px;
+    }
+    .toolbar {
+      display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between;
+      gap: 10px 18px; padding: 11px 12px; background: #fff; border-radius: 10px 10px 0 0;
+    }
+    .filters { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: end; gap: 7px; }
+    label { display: grid; gap: 3px; min-width: 0; font-size: .82rem; color: var(--muted); }
+    .filters label:first-of-type { inline-size: 8rem; }
+    .filters label:nth-of-type(2) { inline-size: 13rem; }
+    .filters .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    input:not([type="hidden"]), select {
+      min-height: 36px; min-width: 0; width: 100%; padding: 6px 8px;
+      border: 1px solid #aabec4; border-radius: 6px; background: white; color: inherit; font: inherit;
+    }
+    .signin { max-width: 29rem; padding: 16px; }
+    .signin button { margin-block-start: 10px; }
+    .switch {
+      display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px;
+      border: 1px solid #dfe9ec; border-radius: 8px; background: #f4f8f8;
+    }
+    .switch a {
+      display: inline-flex; align-items: center; min-block-size: 30px; padding: 3px 11px;
+      border: 1px solid transparent; border-radius: 5px; color: var(--muted);
+      font-size: .86rem; text-decoration: none; white-space: nowrap;
+    }
+    .switch a:hover { color: var(--accent); background: #e9f1f0; }
+    .switch a[aria-current] { color: var(--accent); background: #fff; border-color: #cfe2dd; font-weight: 700; }
+    .pagination {
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+      gap: 5px 14px; margin-block: 12px 9px; font-size: .88rem;
+    }
+    .log-console { container-type: inline-size; }
+    .log-grid {
+      display: grid; grid-template-columns: 7.6rem 5.8rem minmax(12rem, 32%) minmax(0, 1fr) 4.2rem;
+      align-items: baseline; gap: 0 10px; padding: 4px 11px; font-size: .875rem;
+    }
+    .log-head {
+      position: sticky; inset-block-start: 0; z-index: 1; padding-block: 7px;
+      background: #eaf2f3; color: #3b5667; font-size: .81rem; font-weight: 650;
+    }
+    .log-head > :last-child { text-align: end; }
+    .log-entry { border-block-end: 1px solid #e6edef; }
+    .log-entry:last-child { border-block-end: 0; }
+    .log-entry:nth-child(even) { background: #f9fbfc; }
+    .log-entry:last-child, .log-entry:last-child > summary { border-end-start-radius: 9px; border-end-end-radius: 9px; }
+    .log-summary { list-style: none; cursor: pointer; color: inherit; }
+    .log-summary::-webkit-details-marker { display: none; }
+    .log-summary:hover, .log-summary:focus-visible, .log-entry[open] > .log-summary { background: #edf6f5; }
+    .log-summary:focus-visible { outline-offset: -2px; }
+    .log-time, .log-component { color: var(--muted); white-space: nowrap; }
+    .log-time { font-variant-numeric: tabular-nums; }
+    .log-clock { color: #22394a; font-weight: 600; }
+    .log-event { min-inline-size: 0; overflow-wrap: anywhere; }
+    .log-event-name { font-weight: 680; }
+    .log-note { display: block; color: var(--muted); font-size: .8rem; line-height: 1.35; }
+    .log-result { min-inline-size: 0; }
+    .badge {
+      display: inline-block; margin-inline-end: 3px; white-space: nowrap; padding: 1px 6px;
+      border: 1px solid #dce8ec; border-radius: 4px; font-size: .8rem; background: #edf3f5;
+      font-variant-numeric: tabular-nums;
+    }
+    .badge[data-tone="warning"] { background: #fff5df; border-color: #f1d89f; color: #684a0a; }
+    .badge[data-tone="error"] { background: #fcedef; border-color: #efc8ce; color: #8c3338; }
+    .badge[data-tone="success"] { background: var(--wash); border-color: #cce3dd; color: var(--accent); }
+    .raw-toggle {
+      justify-self: end; display: inline-flex; align-items: center; gap: 4px; min-block-size: 24px;
+      padding-inline: 5px; color: var(--accent); font-size: .8rem; white-space: nowrap;
+    }
+    .raw-toggle::before { content: "▸" / ""; }
+    .log-entry[open] .raw-toggle::before { content: "▾" / ""; }
+    .raw-close, .log-entry[open] .raw-open { display: none; }
+    .log-entry[open] .raw-close { display: inline; }
+    .raw-body { padding: 7px 12px 11px; background: #f4f8f9; border-block-start: 1px solid #e4eded; }
+    .references { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-block-end: 6px; overflow-wrap: anywhere; font-size: .83rem; }
+    .raw-body pre {
+      margin: 0; padding: 9px 11px; overflow: auto; max-block-size: 24rem;
+      background: #fff; border: 1px solid #e0eaed; border-radius: 5px;
+      white-space: pre-wrap; overflow-wrap: anywhere; font: .8rem/1.5 ui-monospace, monospace;
+    }
+    .log-empty { margin: 0; padding: clamp(36px, 6vw, 64px) 16px; text-align: center; color: var(--muted); }
+    @media (max-width: 38rem) {
+      .toolbar { align-items: start; padding: 9px; }
+      .filters { display: grid; flex: 1 1 100%; grid-template-columns: minmax(6rem, 1fr) minmax(0, 1.5fr); }
+      .filters label:first-of-type, .filters label:nth-of-type(2) { inline-size: auto; }
+      .filters .actions { grid-column: 1 / -1; }
+    }
+    @container (width < 46rem) {
+      .log-head { display: none; }
+      .log-summary {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "time component source" "event event result";
+        gap: 0 8px; padding: 5px 9px;
+      }
+      .log-time { grid-area: time; }
+      .log-component { grid-area: component; white-space: normal; }
+      .log-event { grid-area: event; }
+      .log-result { grid-area: result; max-inline-size: 9rem; text-align: end; }
+      .log-result .badge { margin-inline-end: 0; }
+      .raw-toggle { grid-area: source; }
+    }
+    .empty { padding: 12px; color: var(--muted); }
+    .error { color: #942323; }
+  </style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+  <main{% if enter_from_login %} class="console-enter"{% endif %}>
+    <header class="console-header">
+      <h1 id="log-title">运行日志</h1>
+      <a class="return-home" href="/">返回主页</a>
+      <!-- Made with ❤ by CC2001 & Codex -->
+    </header>
+    {% if error %}<p class="empty error" role="alert">{{ error }}</p>{% endif %}
+    {% if signin %}
+      <form class="signin" method="post" action="{{ path }}" aria-label="管理员登录">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>访问凭据<input name="credential" type="password" autocomplete="current-password" maxlength="1024" required></label>
+        <button type="submit">登录</button>
+      </form>
+    {% elif rows is defined %}
+
+      <section class="log-console" aria-label="日志列表">
+      <div class="toolbar" data-log-toolbar>
+        <nav class="switch" aria-label="日志范围">
+          <a href="{{ url(mode='important') }}"{% if mode == 'important' %} aria-current="page"{% endif %}>重点</a>
+          <a href="{{ url(mode='attention') }}"{% if mode == 'attention' %} aria-current="page"{% endif %}>异常</a>
+          <a href="{{ url(mode='all') }}"{% if mode == 'all' %} aria-current="page"{% endif %}>全部</a>
+        </nav>
+      <form class="filters" action="{{ path }}" method="get" aria-label="筛选日志">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <label>进程
+          <select name="component" data-log-component>
+            <option value="">全部进程</option>
+            {% for value, label in components.items() %}
+            <option value="{{ value }}"{% if value == filters.component %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>关联 ID<input name="related_id" type="search" value="{{ filters.related_id }}" maxlength="128" placeholder="录音、转写任务或通知 ID"></label>
+        <div class="actions">
+          <button type="submit">查询</button>
+          <a class="button" href="{{ url(component=none, related_id=none) }}">清空筛选</a>
+        </div>
+      </form>
+      </div>
+      <div class="log-head log-grid" aria-hidden="true">
+        <span>时间</span><span>进程</span><span>事件</span><span>结果</span><span>原文</span>
+      </div>
+      <div data-log-rows>
+        {% for row in rows %}
+        <details class="log-entry">
+          <summary class="log-summary log-grid">
+            <time class="log-time" datetime="{{ row.raw.time }}">{% set stamp = row.time.split(' ', 1) %}{% if stamp|length == 2 %}{{ stamp[0] }} <span class="log-clock">{{ stamp[1] }}</span>{% else %}{{ row.time }}{% endif %}</time>
+            <span class="log-component">{{ row.component }}</span>
+            <span class="log-event">
+              <span class="log-event-name">{{ row.title }}</span>
+              {% if row.reason or row.context %}
+              <span class="log-note">{% if row.reason %}{{ row.reason }}{% endif %}{% for label, value in row.context %}{% if row.reason or not loop.first %} · {% endif %}{{ label }} {{ value }}{% endfor %}</span>
+              {% endif %}
+            </span>
+            <span class="log-result">
+              {% if row.counts %}
+                {% for label, value, tone in row.counts %}<span class="badge" data-tone="{{ tone }}">{{ label }} {{ value }}</span>{% endfor %}
+              {% elif row.result %}<span class="badge" data-tone="{{ row.tone }}">{{ row.result }}</span>{% else %}—{% endif %}
+            </span>
+            <span class="raw-toggle"><span class="raw-open">查看</span><span class="raw-close">收起</span></span>
+          </summary>
+          <div class="raw-body">
+            {% if row.identifiers %}
+            <div class="references">
+              {% for label, identifier in row.identifiers %}<a href="{{ url(related_id=identifier, component=none, mode='all') }}">{{ label }} {{ identifier }}</a>{% endfor %}
+            </div>
+            {% endif %}
+            <pre>{{ row.raw | tojson(indent=2) }}</pre>
+          </div>
+        </details>
+        {% else %}
+        <p class="log-empty">{{ {"important": "没有匹配的重点日志。", "attention": "没有匹配的异常日志。"}.get(mode, "没有匹配的日志。") }}</p>
+        {% endfor %}
+      </div>
+      {% if has_previous or next_cursor %}
+      <nav class="pagination" aria-label="日志分页">
+        {% if has_previous %}<a class="button" href="{{ url() }}">回到最新</a>{% endif %}
+        {% if next_cursor %}<a class="button" data-older-logs href="{{ url(before=next_cursor) }}">加载更早的日志</a>{% endif %}
+        <span class="log-component" data-log-load-status role="status" aria-live="polite" tabindex="-1"></span>
+      </nav>
+      {% endif %}
+      </section>
+    {% endif %}
+  </main>
+  {% if rows is defined %}
+  <script nonce="{{ nonce }}">
+    (() => {
+      const component = document.querySelector('[data-log-component]');
+      component.addEventListener('change', () => component.form.requestSubmit());
+
+    })();
+  </script>
+  {% endif %}
+  {% if rows and next_cursor %}
+  <script nonce="{{ nonce }}">
+    (() => {
+      const rows = document.querySelector('[data-log-rows]');
+      const older = document.querySelector('[data-older-logs]');
+      const status = document.querySelector('[data-log-load-status]');
+      let loading = false;
+      let fallback = false;
+      const observer = 'IntersectionObserver' in window
+        ? new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting)) loadOlder();
+          }, { rootMargin: '0px 0px 160px' })
+        : null;
+
+      async function loadOlder(fromLink = false) {
+        if (loading || fallback || older.hidden) return;
+        loading = true;
+        observer?.unobserve(older);
+        status.textContent = '正在加载…';
+        const url = older.href;
+        try {
+          const response = await fetch(url, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('Cannot load logs');
+          const nextPage = new DOMParser().parseFromString(await response.text(), 'text/html');
+          if (!nextPage.querySelector('[data-log-toolbar]')) throw new Error('Missing log page');
+          const pageRows = nextPage.querySelectorAll('[data-log-rows] > .log-entry');
+          const next = nextPage.querySelector('[data-older-logs]');
+          if (next && (new URL(next.getAttribute('href'), url).href === url || !pageRows.length)) {
+            throw new Error('Invalid log cursor');
+          }
+          rows.append(...pageRows);
+          if (next) {
+            older.href = new URL(next.getAttribute('href'), url);
+            status.textContent = '';
+            observer?.observe(older);
+          } else {
+            older.hidden = true;
+            status.textContent = '已显示全部匹配日志';
+          }
+          if (fromLink) (pageRows[0]?.querySelector('summary') ?? status).focus();
+        } catch {
+          fallback = true;
+          status.textContent = '加载失败，可打开更早的日志';
+        } finally {
+          loading = false;
+        }
+      }
+
+      older.addEventListener('click', event => {
+        if (fallback || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        loadOlder(true);
+      });
+      observer?.observe(older);
+    })();
+  </script>
+  {% endif %}
+  {% include "celebration.html" %}
+</body>
+</html>

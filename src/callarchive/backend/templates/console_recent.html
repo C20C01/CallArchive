@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>近期归档</title>
+  <style nonce="{{ nonce }}">{{ console_css | safe }}</style>
+  <style nonce="{{ nonce }}">
+    * { box-sizing: border-box }
+    html:has(dialog:modal), body:has(dialog:modal) { overflow: hidden }
+    body { margin: 0; font-size: 15px; line-height: 1.55 }
+    main { margin: auto }
+    .panel { --panel-inline-padding: 16px; background: var(--surface); border: 1px solid var(--line); overflow: hidden }
+    .actions { display: flex; align-items: end; flex-wrap: wrap; gap: 12px }
+    #filters, .pager { padding: 16px var(--panel-inline-padding) }
+    #filters { column-gap: 16px }
+    .archive-window-note { margin: 0; color: #61737c; font-size: .875rem }
+    #filters > label { flex: 1 1 13rem; max-width: 22rem; color: var(--muted); font-size: .875rem }
+    #filters label input { width: 100%; min-width: 0; font-size: 15px }
+    #filters .search-actions { margin-inline-start: auto; flex: 0 0 auto }
+    label { display: grid; gap: 4px; font-weight: 650; min-width: 0 }
+    button, input { padding: 8px 12px; border: 1px solid var(--line); color: inherit; background: white; font: inherit }
+    button { cursor: pointer; font-weight: 650 }
+    .table-wrap { overflow: auto; border-block: 1px solid var(--line); border-radius: 0 }
+    table { width: 100%; min-width: 550px; border-collapse: collapse; text-align: left }
+    th, td { padding: 10px var(--panel-inline-padding); vertical-align: middle; white-space: nowrap }
+    th { background: #eff5f5 }
+    .action-cell { width: 1% }
+    button.phone-link.secondary {
+      min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--accent);
+      font: inherit; text-decoration: underline; text-underline-offset: 3px;
+    }
+    button.phone-link.secondary:hover { color: var(--accent-hover) }
+    tbody tr + tr { border-top: 1px solid var(--line) }
+    td, time { font-variant-numeric: tabular-nums }
+    .pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px }
+    .pager-info { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 24px }
+    .pager > .actions { margin-inline-start: auto }
+    dialog { overscroll-behavior: contain; width: min(780px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0;
+      color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 60px #13283a35 }
+    dialog::backdrop { background: #14253688 }
+    .detail-header { position: sticky; top: 0; z-index: 1; padding: 16px 20px; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px; background: white; border-bottom: 1px solid var(--line) }
+    .detail-header h2, h3 { margin: 0 }
+    .detail-body { padding: 16px 20px 24px }
+    dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%,185px),1fr)); gap: 12px 18px; margin: 0 0 16px }
+    dt { font-size: .87rem; color: var(--muted) }
+    dd { margin: 2px 0 0; overflow-wrap: anywhere }
+    .recording {
+      display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px;
+      border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-block-start: 12px;
+    }
+    .segment-heading, .attachment-row, .recording-file-actions {
+      display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+    }
+    .segment-heading, .attachment-row { justify-content: space-between }
+    .segment-heading h3 { font-size: .95rem }
+    .segment-expiry { color: var(--muted); font-size: .82rem;
+      font-variant-numeric: tabular-nums; white-space: nowrap }
+    .recording-player, .transcript {
+      padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #f4f8f7;
+    }
+    .attachment-label { font-weight: 650 }
+    .recording-file-actions { margin-inline-start: auto }
+    .recording-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 16px;
+      margin-block-start: 4px }
+    .recording-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      flex: 1 1 165px; align-items: center; gap: 8px }
+    .recording-controls input { width: 100%; min-width: 0; min-height: 24px; margin: 0; padding: 0;
+      accent-color: var(--accent) }
+    .recording-controls span { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
+    .recording-volume { display: grid; grid-template-columns: auto minmax(0, 1fr);
+      flex: 0 1 100px; align-items: center; gap: 6px; font-weight: 400 }
+    .recording-player .playback-error { color: #9a2732; margin-top: 6px; font-size: .88rem }
+    .recording p { margin: 0; color: var(--muted) }
+    .detail-message { margin: 0; color: var(--muted) }
+    .transcript pre { max-height: min(20rem, 30dvh); overflow: auto; overscroll-behavior: contain;
+      margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit;
+      padding: 12px; border-radius: 6px; background: #f2f6f7 }
+    @media (max-width: 700px) {
+      .panel { --panel-inline-padding: 12px }
+      #filters, .pager { padding-block: 12px }
+      .detail-header, .detail-body { padding-inline: 12px }
+    }
+  </style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+<main{% if enter_from_login %} class="console-enter"{% endif %}>
+  <header class="console-header">
+    <h1>近期归档</h1>
+    <a class="return-home" href="/">返回主页</a>
+  </header>
+  <section class="panel" aria-label="近期归档查询">
+    <form id="filters" class="actions">
+      <label>被叫<input name="mobile" type="tel" pattern="\+?[0-9]{1,20}" maxlength="21"></label>
+      <div class="actions search-actions">
+        <button type="submit">查询</button><button id="clear" type="button" class="secondary">清空筛选</button>
+      </div>
+    </form>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="近期归档列表">
+      <table><thead><tr><th scope="col">归档时间</th><th scope="col">拨打时间</th><th scope="col">被叫</th><th scope="col">录音段数</th>
+        <th scope="col" class="action-cell">操作</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div class="pager">
+      <div class="pager-info">
+        <span id="message" role="status"></span>
+        <p class="archive-window-note">仅显示过去 24 小时内归档的话单</p>
+      </div>
+      <div class="actions">
+        <button id="previous" type="button" class="secondary" disabled>上一页</button>
+        <button id="next" type="button" class="secondary" disabled>下一页</button>
+      </div>
+    </div>
+  </section>
+</main>
+<dialog closedby="any" id="detail" aria-labelledby="detail-title">
+  <header class="detail-header">
+    <h2 id="detail-title">归档详情</h2>
+    <form method="dialog" class="actions">{% set close_button_class = "secondary" %}{% include "console_detail_close.html" %}</form>
+  </header>
+  <div class="detail-body" id="detail-body"></div>
+</dialog>
+<script nonce="{{ nonce }}">
+  const byId = id => document.getElementById(id);
+  const form = byId('filters'), dialog = byId('detail'), body = byId('detail-body');
+  const root = '/api/archives/recent';
+  let offset = 0, next = null, applied = new URLSearchParams(), listRequest, detailRequest;
+  function node(tag, text = '') {
+    const result = document.createElement(tag); result.textContent = text; return result;
+  }
+  const display = stamp => stamp ? stamp.slice(0, 19).replace('T', ' ') : '—';
+  async function read(url, signal) {
+    const response = await fetch(url, {signal, cache: 'no-store'});
+    if (!response.ok) throw new Error(response.status === 404 ? '附件不存在或已到期。' : '暂时无法读取，请重试。');
+    return response;
+  }
+  function attachmentURL(talkId, fileId, kind, inline) {
+    const params = new URLSearchParams({file_id: fileId, kind, inline: String(inline)});
+    return `${root}/${encodeURIComponent(talkId)}/attachment?${params}`;
+  }
+  function download(talkId, file, kind) {
+    const link = node('a', kind === 'audio' ? '下载录音' : '下载 TXT');
+    link.href = attachmentURL(talkId, file.file_id, kind, false);
+    link.download = file[kind];
+    return link;
+  }
+  function facts(items) {
+    const list = node('dl');
+    for (const [label, value] of items) {
+      const cell = node('div');
+      cell.append(node('dt', label), node('dd', value ?? '—'));
+      list.append(cell);
+    }
+    return list;
+  }
+  {% include "console_recording_controls.html" %}
+  function recordingPlayer(talkId, file) {
+    const panel = node('div');
+    panel.className = 'recording-player';
+    const header = node('div');
+    header.className = 'attachment-row';
+    const toggle = node('button', '播放');
+    toggle.type = 'button';
+    toggle.className = 'secondary recording-toggle';
+    const link = download(talkId, file, 'audio');
+    link.textContent = '下载';
+    link.className = 'recording-download';
+    link.setAttribute('aria-label', '下载录音');
+    const label = node('span', '录音');
+    label.className = 'attachment-label';
+    const fileActions = node('div');
+    fileActions.className = 'recording-file-actions';
+    fileActions.append(toggle, link);
+    header.append(label, fileActions);
+
+    const audio = node('audio');
+    audio.preload = 'none';
+    audio.hidden = true;
+    audio.src = attachmentURL(talkId, file.file_id, 'audio', true);
+
+    return attachRecordingControls(panel, header, toggle, audio, dialog, file.audio, node);
+  }
+
+  async function openDetail(call) {
+    detailRequest?.abort();
+    const request = detailRequest = new AbortController();
+    const message = node('p', '加载归档附件…');
+    message.className = 'detail-message';
+    message.setAttribute('role', 'status');
+    for (const audio of body.querySelectorAll('audio')) audio.pause();
+    body.replaceChildren(message);
+    if (!dialog.open) dialog.showModal();
+    try {
+      const response = await read(root + '/' + encodeURIComponent(call.talk_id), request.signal);
+      const {files} = await response.json();
+      if (request.signal.aborted) return;
+      body.replaceChildren(facts([
+        ['被叫', call.mobile || '—'], ['拨打时间', display(call.call_time)],
+        ['归档时间', display(call.archived_at)]
+      ]));
+      if (!files.length) body.append(node('p', '本地附件已到期。'));
+      for (const [index, file] of files.entries()) {
+        const section = node('section'); section.className = 'recording';
+        const heading = node('header');
+        heading.className = 'segment-heading';
+        heading.append(node('h3', files.length === 1 ? '归档附件' : `第 ${index + 1} 段`));
+        if (file.expires_at) {
+          const deadline = display(file.expires_at).slice(0, 16)
+            .replace(/^\d{4}-(\d{2})-(\d{2})/, (_, month, day) => `${Number(month)} 月 ${Number(day)} 日`);
+          const expiry = node('span', `本地附件将于 ${deadline} 到期`);
+          expiry.className = 'segment-expiry';
+          heading.append(expiry);
+        }
+        section.append(heading);
+        if (file.audio) section.append(recordingPlayer(call.talk_id, file));
+        if (file.text) {
+          const transcript = node('div'); transcript.className = 'transcript';
+          const header = node('div');
+          header.className = 'attachment-row';
+          const label = node('span', '转写文本');
+          label.className = 'attachment-label';
+          const show = node('button', '展开');
+          show.className = 'secondary transcript-toggle';
+          show.type = 'button';
+          const text = node('pre'); text.hidden = true;
+          text.tabIndex = 0;
+          text.setAttribute('role', 'region');
+          text.setAttribute('aria-label', `第 ${index + 1} 段转写正文`);
+          text.id = `transcript-preview-${index}`;
+          show.setAttribute('aria-controls', text.id);
+          show.setAttribute('aria-expanded', 'false');
+          show.addEventListener('click', async () => {
+            const expanded = text.hidden;
+            text.hidden = !expanded;
+            show.setAttribute('aria-expanded', String(expanded));
+            show.textContent = expanded ? '收起' : '展开';
+            if (!expanded || text.dataset.loaded || text.getAttribute('aria-busy') === 'true') return;
+            text.textContent = '加载转写文本…';
+            text.setAttribute('aria-busy', 'true');
+            try {
+              const response = await read(attachmentURL(call.talk_id, file.file_id, 'text', true), request.signal);
+              text.textContent = await response.text();
+              text.dataset.loaded = 'true';
+            } catch (error) {
+              if (!request.signal.aborted) text.textContent = error.message;
+            } finally { text.removeAttribute('aria-busy'); }
+          });
+          const link = download(call.talk_id, file, 'text');
+          link.textContent = '下载';
+          link.setAttribute('aria-label', '下载转写文本');
+          link.className = 'recording-download';
+          const actions = node('div');
+          actions.className = 'recording-file-actions';
+          actions.append(show, link);
+          header.append(label, actions);
+          transcript.append(header, text);
+          section.append(transcript);
+        }
+        if (!file.audio && !file.text) section.append(node('p', '本地附件不可用。'));
+        body.append(section);
+      }
+    } catch (error) {
+      if (!request.signal.aborted) body.textContent = error.message;
+    }
+  }
+  async function load(criteria, start) {
+    listRequest?.abort();
+    const request = listRequest = new AbortController();
+    byId('previous').disabled = byId('next').disabled = true;
+    byId('message').textContent = '查询中…';
+    try {
+      const params = new URLSearchParams(criteria); params.set('offset', start);
+      const response = await read(root + '?' + params, request.signal);
+      const data = await response.json();
+      if (request.signal.aborted) return;
+      const rows = byId('rows'); rows.replaceChildren();
+      for (const call of data.calls) {
+        const row = rows.insertRow();
+        row.insertCell().textContent = display(call.archived_at);
+        row.insertCell().textContent = display(call.call_time);
+        const mobileCell = row.insertCell();
+        if (call.mobile) {
+          const phone = node('button', call.mobile);
+          phone.type = 'button';
+          phone.className = 'secondary phone-link';
+          phone.addEventListener('click', () => {
+            form.elements.mobile.value = call.mobile;
+            form.requestSubmit();
+          });
+          mobileCell.append(phone);
+        } else {
+          mobileCell.textContent = '—';
+        }
+        row.insertCell().textContent = call.recording_count ?? '—';
+        const button = node('button', '详情'); button.type = 'button'; button.className = 'secondary call-action';
+        button.addEventListener('click', () => openDetail(call));
+        row.insertCell().append(button);
+      }
+      applied = criteria; offset = start; next = data.next_offset;
+      byId('message').textContent = data.calls.length ? `第 ${start / 30 + 1} 页 · 本页 ${data.calls.length} 通` : '没有符合条件的归档话单。';
+    } catch (error) {
+      if (!request.signal.aborted) byId('message').textContent = error.message;
+    } finally {
+      if (!request.signal.aborted) {
+        byId('previous').disabled = !offset;
+        byId('next').disabled = next === null;
+      }
+    }
+  }
+  dialog.addEventListener('close', () => {
+    if (dialog.open) return;
+    detailRequest?.abort();
+    for (const audio of body.querySelectorAll('audio')) audio.pause();
+    body.replaceChildren();
+  });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    load(new URLSearchParams([...new FormData(form)].filter(([, value]) => value.trim())), 0);
+  });
+  byId('clear').addEventListener('click', () => { form.reset(); load(new URLSearchParams(), 0); });
+  byId('previous').addEventListener('click', () => load(applied, Math.max(0, offset - 30)));
+  byId('next').addEventListener('click', () => { if (next !== null) load(applied, next); });
+  load(applied, 0);
+</script>
+  {% include "celebration.html" %}
+</body>
+</html>

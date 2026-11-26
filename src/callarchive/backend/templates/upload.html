@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}上传录音 · CallArchive{% endblock %}
+{% block layout %}narrow{% endblock %}
+{% block content %}
+  <header class="console-header page-heading">
+    <h1 id="upload">上传归档录音</h1>
+    <a class="quiet" href="/">返回</a>
+  </header>
+  <form class="panel form" action="/workbench/upload" method="post" enctype="multipart/form-data" aria-labelledby="upload">
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <input type="hidden" name="request_id" value="{{ request_id }}">
+    <label for="audio">录音文件</label>
+    <input id="audio" name="audio" type="file" accept=".wav,.mp3,.flac" aria-describedby="format" required>
+    <small id="format">WAV、MP3 或 FLAC</small>
+    <fieldset>
+      <legend>话单信息（选填）</legend>
+      <div class="grid">
+        <div><label for="callee">被叫</label><input id="callee" name="callee" type="tel" maxlength="64"></div>
+        <div><label for="caller">主叫</label><input id="caller" name="caller" type="tel" maxlength="64"></div>
+      </div>
+      <label for="external_id">来源话单编号</label>
+      <input id="external_id" name="external_id" maxlength="256">
+    </fieldset>
+    {% if external_archive_enabled %}
+      <label for="flow">归档位置</label>
+      <select id="flow" name="flow">
+        <option value="local"{% if default_flow == "local" %} selected{% endif %}>本地档案</option>
+        <option value="remote"{% if default_flow == "remote" %} selected{% endif %}>外部档案系统</option>
+      </select>
+    {% endif %}
+    <button type="submit">提交归档</button>
+  </form>
+{% endblock %}

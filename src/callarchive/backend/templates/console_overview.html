@@ -1,0 +1,20 @@
+<section class="overview" aria-labelledby="overview-title">
+  <header class="overview-header">
+    <h2 id="overview-title">运行概况</h2>
+    <a class="refresh-link" href="/">刷新概况</a>
+  </header>
+  <dl class="overview-metrics">
+    <div><dt>话单同步</dt><dd>{{ overview.poll }}<small>{{ overview.poll_note }}</small></dd></div>
+    <div><dt>转写服务</dt><dd data-worker="{{ overview.worker_state }}">{{ overview.worker }}</dd></div>
+    <div><dt>上次归档成功</dt><dd>{{ overview.archive }}</dd></div>
+    <div><dt>录音盘余量</dt><dd>{{ overview.free }}<small>{{ overview.capacity }}</small></dd></div>
+  </dl>
+  <section class="followup-section" aria-labelledby="followup-title">
+    <h3 id="followup-title">待处理</h3>
+    <ul class="followups">
+      <li><a href="/calls/pending?status=waiting_recording"><span>等待录音</span><strong>{{ overview.recording }}</strong></a></li>
+      <li><a href="/calls/pending?status=waiting_applicant" data-kind="followup"><span>待补录档案</span><strong>{{ overview.applicant }}</strong></a></li>
+      <li><a href="/calls/pending?status=attention" data-kind="attention"><span>处理异常</span><strong>{{ overview.attention }}</strong></a></li>
+    </ul>
+  </section>
+</section>

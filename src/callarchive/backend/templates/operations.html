@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}运行日志 · CallArchive{% endblock %}
+{% block content %}
+  <header class="console-header page-heading">
+    <h1 id="operations">运行日志</h1>
+    <a class="quiet" href="/">返回</a>
+  </header>
+  <form action="/workbench/operations" method="get" class="panel form" aria-label="筛选运行日志">
+    <label for="related_id">录音、转写任务或通知 ID</label>
+    <input id="related_id" name="related_id" value="{{ related_id or '' }}" maxlength="128">
+    <label for="component">进程</label>
+    <select id="component" name="component">
+      <option value="">全部进程</option>
+      {% for value, label in components.items() %}
+        <option value="{{ value }}"{% if component == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+  </form>
+  {% if result["items"] %}
+    <div class="table-wrap panel" tabindex="0" role="region" aria-labelledby="operations">
+      <table>
+        <thead><tr><th scope="col">时间</th><th scope="col">进程</th><th scope="col">事件</th><th scope="col">关联 ID</th></tr></thead>
+        <tbody>
+          {% for row in result["items"] %}
+            <tr>
+              <td><time datetime="{{ row.time }}">{{ row.time }}</time></td>
+              <td>{{ components.get(row.component, row.component) }}</td>
+              <td><strong>{{ row.event }}</strong><br><small>{{ row.level }}{% if row.status %} · {{ status_labels.get(row.status, row.status) }}{% endif %}{% if row.reason %} · {{ error_labels.get(row.reason, row.reason) }}{% endif %}</small></td>
+              <td class="code">
+                {% if row.recording_id %}<a href="/workbench/recordings/{{ row.recording_id }}?all_owners=1">{{ row.recording_id }}</a>{% endif %}
+                {% if row.job_id %}<div>{{ row.job_id }}</div>{% endif %}
+                {% if row.message_id %}<div>{{ row.message_id }}</div>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}<p class="panel empty">暂无匹配的运行日志。</p>{% endif %}
+  {% if next_url %}<nav aria-label="运行日志分页"><a href="{{ next_url }}">更早的日志</a></nav>{% endif %}
+{% endblock %}

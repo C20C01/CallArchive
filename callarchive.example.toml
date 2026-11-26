@@ -1,0 +1,40 @@
+# 相对路径以配置文件所在目录为准。外部服务凭据由环境变量注入。
+
+[backend]
+database = "data/archive.sqlite"
+port = 8766
+transcription_url = "http://127.0.0.1:8765"
+admins = []
+secure_cookies = false
+# followup_names = { "10001" = "示例跟进人", "10002" = "示例跟进人" }
+
+[transcription]
+database = "data/transcription.sqlite"
+port = 8765
+engine = "demo"
+# 启用网页转写时填入专用的非服务身份。
+# web_gateway_owner = "browser-gateway"
+
+[outbound]
+flow = "local"
+# 仟客等外呼适配器的完整配置见 docs/integrations.md。
+
+[archive]
+attachments = "data/attachments"
+history_retention_days = 7
+# 北森等档案适配器的完整配置见 docs/integrations.md。
+
+[notifications]
+channel = "preview"
+timezone = "Asia/Hong_Kong"
+daily_at = 09:43:00
+destination = "operator"
+output = "data/reports"
+# 启用日报或提醒时填入归属账号。
+# owner = "operator"
+
+[logging]
+level = "INFO"
+format = "text"
+database = "data/operations.sqlite"
+retention_days = 7

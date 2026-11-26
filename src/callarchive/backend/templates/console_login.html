@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title }} · 登录</title>
+  <style nonce="{{ nonce }}">{{ console_css | safe }}</style>
+  <style nonce="{{ nonce }}">
+    body { margin: 0; }
+    .login-layout { box-sizing: border-box; margin-inline: auto; }
+    .login-layout > :is(.console-header, .login-panel) {
+      box-sizing: border-box; max-inline-size: var(--compact-header-width); margin-inline: auto;
+    }
+    .login-panel { display: grid; gap: 14px;
+      padding: clamp(16px, 5vw, 24px);
+      border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .login-panel h2, .login-panel p { margin: 0; }
+    .login-panel h2 { font-size: 1.15rem; }
+    .login-field { display: grid; min-inline-size: 0; gap: 6px; }
+    .login-field label { font-size: .9rem; font-weight: 600; }
+    .login-panel input { box-sizing: border-box; inline-size: 100%; padding: 8px 11px;
+      border: 1px solid #a9c0c5; color: var(--ink); background: #f8fbfa; font: inherit; }
+    .login-panel button { justify-self: end; border-style: solid; cursor: pointer; }
+    .login-panel [role="alert"] { color: #912e37; font-size: .9rem; }
+  </style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+  <main class="login-layout">
+    <header class="console-header"><h1>{{ title }}</h1></header>
+    <form class="login-panel" method="post" action="{{ action }}" aria-labelledby="login-title">
+      <h2 id="login-title">登录</h2>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if destination is defined %}<input type="hidden" name="destination" value="{{ destination }}">{% endif %}
+      <div class="login-field">
+        <label for="console-credential">访问凭据</label>
+        <input type="password" id="console-credential" name="credential" autocomplete="current-password"
+               maxlength="1024" aria-invalid="{{ 'true' if error else 'false' }}" {% if error %}aria-describedby="login-error"{% endif %} required>
+      </div>
+      {% if error %}<p id="login-error" role="alert">{{ error }}</p>{% endif %}
+      <button type="submit">登录</button>
+    </form>
+  </main>
+  {% include "celebration.html" %}
+</body>
+</html>

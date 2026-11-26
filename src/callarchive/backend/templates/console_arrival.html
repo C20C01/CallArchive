@@ -1,0 +1,22 @@
+<style nonce="{{ nonce }}">
+    :root { --compact-header-width: 29rem; }
+    @media (prefers-reduced-motion: no-preference) {
+      .console-enter { --console-expand-time: 420ms; }
+      .console-enter > .console-header {
+        margin-inline: auto;
+        animation: expand-heading var(--console-expand-time) cubic-bezier(.2, .7, .2, 1);
+      }
+      .console-enter > .console-header > :is(.role, .return-home),
+      .console-enter > .console-header ~ * {
+        animation: reveal-home-content 180ms ease-out var(--console-expand-time) both;
+      }
+      @keyframes expand-heading {
+        from { max-inline-size: var(--compact-header-width); }
+        to { max-inline-size: 100%; }
+      }
+      @keyframes reveal-home-content {
+        from { opacity: 0; visibility: hidden; }
+        to { opacity: 1; visibility: visible; }
+      }
+    }
+</style>

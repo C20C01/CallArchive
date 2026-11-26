@@ -1,0 +1,17 @@
+/.venv/
+/data/
+/build/
+/dist/
+/private/
+/secrets/
+/callarchive.toml
+.env
+.env.*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key
+__pycache__/
+*.egg-info/

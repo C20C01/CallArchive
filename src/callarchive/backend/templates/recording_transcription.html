@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>录音转写</title>
+  <style nonce="{{ nonce }}">
+    :root { color:#182339; background:#f5f7fa; font-family:"Inter",system-ui,sans-serif; }
+    * { box-sizing:border-box; }
+    html { scrollbar-gutter:stable; }
+    html:has(dialog:modal), body:has(dialog:modal) { overflow:hidden; }
+    body { margin:0; }
+    main { max-width:900px; margin:auto; padding:32px 20px; }
+    h1 { margin:0 0 18px; font-size:1.8rem; }
+    h2 { margin:0 0 12px; font-size:1.1rem; }
+    .panel { background:white; border:1px solid #d8e0ea; border-radius:8px; padding:16px; margin-bottom:14px; }
+    .status-panel { padding: clamp(12px, 2vw, 16px); }
+    .status-panel h2 { margin-block-end: 10px; }
+    .service-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr));
+      gap: 8px;
+      margin: 0;
+    }
+    .service-metrics > div {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--wash);
+    }
+    .service-metrics dt, .muted { color: var(--muted); font-size: .875rem; }
+    .service-metrics dd { margin: 2px 0 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+    #status-error:empty { margin: 0; }
+    #worker[data-online="true"] { color: var(--accent); }
+    #worker[data-online="false"] { color: #895710; }
+    .task-panel { padding: clamp(12px, 2vw, 20px); }
+    .task-panel > .section-heading { padding-block-end: 10px; }
+    .task-panel > .section-heading .row { margin-inline-start: auto; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    button, input { padding:8px 10px; border:1px solid #9faec2; border-radius:5px; font:inherit; max-width:100%; }
+    button { color:white; background:#244b85; cursor:pointer; }
+    button:disabled { opacity:.65; cursor:wait; }
+    .secondary { color:#244b85; background:white; }
+    :focus-visible { outline:2px solid #2256a3; outline-offset:2px; }
+    ul { list-style:none; padding:0; margin:0; }
+    li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;
+         border-top:1px solid #e5ebf2; padding:10px 0; overflow-wrap:anywhere; }
+    #tasks > li { min-height: 64px; }
+    .task-info { min-width: 0; flex: 1 1 15rem; }
+    .task-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+    .task-source, .task-state { padding: 2px 7px; border-radius: 5px; font-size: .84rem; font-weight: 650; }
+    .task-source { box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+    .task-source[data-source="API"] { background: #eff5fc; color: #315c86; }
+    .task-source[data-source="system"] { background: #f3effa; color: #59477f; }
+    .task-state { background: #eef3f5; color: var(--muted); }
+    .task-state[data-state="running"], .task-state[data-state="done"] {
+      background: var(--wash); color: var(--accent);
+    }
+    .task-state[data-state="failed"] { background: #fbecee; color: #912e37; }
+    .task-meta { margin-block-start: 4px; color: var(--muted); font-size: .875rem; }
+    .task-progress { inline-size: 4.5rem; margin-inline-start: .45rem; vertical-align: middle; accent-color: var(--accent); }
+    #new-task-dialog { padding: 20px; }
+    #upload { display: grid; gap: 6px; margin-block-start: 16px; }
+    #upload > label { font-weight: 650; }
+    #upload input[type="file"] {
+      inline-size: 100%; padding: 7px; border: 1px solid var(--line);
+      background: #f7faf9; color: var(--ink);
+    }
+    #upload input::file-selector-button {
+      margin-inline-end: 8px; padding: 5px 8px; border: 1px solid var(--line);
+      border-radius: 5px; background: var(--surface); color: var(--accent);
+      font: inherit; cursor: pointer;
+    }
+    .upload-notes { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+    #upload .row { justify-content: flex-end; margin-block-start: 8px; }
+    .signin { max-width: 26rem; }
+    .signin form { display: grid; gap: 8px; }
+    dialog.panel { width:min(680px, calc(100% - 32px)); max-height:85vh; margin:auto; color:inherit; overscroll-behavior:contain; }
+    #result { width:min(860px, calc(100% - 32px)); padding:0; }
+    #result[open] { display:flex; flex-direction:column; }
+    .result-header { padding:16px 20px; border-bottom:1px solid #e5ebf2; }
+    .result-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:0 20px 16px; }
+    .result-body pre { line-height:1.7; margin:14px 0 0; }
+    dialog::backdrop { background:#18233980; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; }
+    p { margin:10px 0 0; }
+    [hidden] { display:none !important; }
+      #back-to-top { position:fixed; right:16px; bottom:16px; z-index:2; width:40px; height:40px;
+      padding:0; border-radius:50%; background:#244b85; color:white; font-size:20px; cursor:pointer; }
+    #back-to-top[hidden] { display:none; }
+  </style>
+  <style nonce="{{ nonce }}">{{ console_css | safe }}</style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+  <main{% if enter_from_login %} class="console-enter"{% endif %}>
+    <header class="console-header">
+      <h1>录音转写</h1>
+      <a class="return-home" href="/">返回主页</a>
+    </header>
+    {% if signin %}
+    <section class="panel signin" aria-label="录音转写登录">
+      <form method="post" action="/transcriptions">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="transcription-credential">访问凭据</label>
+        <input id="transcription-credential" name="credential" type="password" autocomplete="current-password"
+               maxlength="1024" required>
+        <button type="submit">登录</button>
+        {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+      </form>
+    </section>
+    {% else %}
+    <section class="panel status-panel" aria-labelledby="status-title">
+      <h2 id="status-title">服务状态</h2>
+      <dl class="service-metrics">
+        <div><dt>转写服务</dt><dd id="worker">—</dd></div>
+        <div><dt>当前处理</dt><dd id="activity">—</dd></div>
+        <div><dt>排队数</dt><dd id="queued-count">—</dd></div>
+      </dl>
+      <p id="status-error" role="status" class="muted"></p>
+    </section>
+    <section class="panel task-panel" aria-labelledby="my-title">
+      <div class="section-heading">
+        <h2 id="my-title">转写任务</h2>
+        <div class="row"><button type="button" id="refresh" class="secondary">刷新</button>
+          <button type="button" id="new-task">转写</button></div>
+      </div>
+      <p id="upload-status" role="status" class="muted"></p>
+      <p id="empty" class="muted">正在读取…</p>
+      <ul id="tasks"></ul>
+    </section>
+    <dialog closedby="any" class="panel" id="result" aria-labelledby="result-title">
+      <header class="result-header">
+        <div class="section-heading">
+          <h2 id="result-title" tabindex="-1">任务详情</h2>
+          <div class="row"><button type="button" id="download" hidden>下载 TXT</button>
+            <button type="button" id="close-result" class="secondary">关闭</button></div>
+        </div>
+        <p id="result-expiry" class="muted" hidden></p>
+      </header>
+      <div class="result-body">
+        <p id="result-message" role="status"></p>
+        <pre id="text" hidden></pre>
+      </div>
+    </dialog>
+    <dialog closedby="any" class="panel" id="new-task-dialog" aria-labelledby="submit-title">
+      <div class="section-heading">
+        <h2 id="submit-title">新建转写</h2>
+        <button type="button" id="close-upload" class="secondary">关闭</button>
+      </div>
+      <form id="upload">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="upload-audio">录音文件</label>
+        <input id="upload-audio" name="audio" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav"
+               aria-describedby="limits retention" required autofocus>
+        <div class="upload-notes muted">
+          <span id="limits">支持 MP3 和 WAV</span>
+          <span id="retention"></span>
+        </div>
+        <div class="row"><button type="submit">开始转写</button></div>
+        <p id="notice" role="status"></p>
+      </form>
+    </dialog>
+    {% endif %}
+  </main>
+  {% if not signin %}
+  <button type="button" id="back-to-top" aria-label="回到顶部" title="回到顶部" hidden>↑</button>
+<script nonce="{{ nonce }}">
+    const el = id => document.getElementById(id);
+    const form = el('upload');
+    const uploadDialog = el('new-task-dialog');
+    const resultDialog = el('result');
+    const submit = form.querySelector('button');
+    const endpoint = '/transcriptions/api';
+    const statuses = {
+      queued: '排队中', running: '转写中', done: '已完成', failed: '失败',
+      expired: '已过期', unconfirmed: '提交待确认', unavailable: '暂不可用'
+    };
+    const sourceLabels = {web: '网页', API: 'API', system: '系统'};
+    const progressLabels = {
+      preparing: '准备录音', detecting_speech: '检测语音', diarizing: '区分说话人',
+      recognizing: '识别片段', formatting: '整理文本', saving: '保存结果'
+    };
+    const taskRows = new Map();
+    let refreshing = null, limit = null, selected = null;
+    let resultVersion = 0, returnFocus = null;
+    let refreshTimer, uploadRequestId;
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, {credentials:'same-origin', cache:'no-store', ...options});
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '请求失败（HTTP ' + response.status + '）');
+      return data;
+    }
+
+    function closeResult(restoreFocus = true) {
+      resultVersion++;
+      selected = null;
+      if (resultDialog.open) resultDialog.close();
+      el('text').textContent = '';
+      if (restoreFocus) (returnFocus?.isConnected ? returnFocus : el('refresh')).focus();
+    }
+
+    async function showResult(taskId, trigger, filename) {
+      const version = ++resultVersion;
+      selected = null;
+      returnFocus = trigger;
+      el('text').hidden = true;
+      el('text').textContent = '';
+      el('download').hidden = true;
+      el('result-expiry').hidden = true;
+      resultDialog.querySelector('.result-body').scrollTop = 0;
+      el('result-message').textContent = '正在读取任务…';
+      resultDialog.showModal();
+      el('result-title').focus();
+      try {
+        const result = await api(endpoint + '/' + encodeURIComponent(taskId));
+        if (version !== resultVersion) return;
+        if (result.expires_at) {
+          el('result-expiry').textContent = '过期时间：' + displayDate(new Date(result.expires_at));
+          el('result-expiry').hidden = false;
+        }
+        if (result.state !== 'done') {
+          el('result-message').textContent = result.error || statuses[result.state] || '暂无结果';
+          return;
+        }
+        selected = {...result, filename};
+        el('text').textContent = result.text;
+        el('text').hidden = false;
+        el('download').hidden = false;
+        el('result-message').textContent = '';
+      } catch (error) {
+        if (version === resultVersion) el('result-message').textContent = error.message;
+      }
+    }
+
+    function refresh() {
+      clearTimeout(refreshTimer);
+      if (!refreshing) {
+        refreshing = loadStatus().then(hasWork => {
+          if (!document.hidden) refreshTimer = setTimeout(refreshVisible, hasWork ? 1000 : 5000);
+        }).finally(() => {
+          refreshing = null;
+        });
+      }
+      return refreshing;
+    }
+
+    function refreshVisible() {
+      if (!document.hidden) refresh();
+    }
+
+    const dateFormat = new Intl.DateTimeFormat('zh-CN', {
+      timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'
+    });
+    function displayDate(date) { return dateFormat.format(date); }
+
+    function makeTaskRow(taskId, filename) {
+      const row = document.createElement('li');
+      const info = document.createElement('div');
+      info.className = 'task-info';
+      const summary = document.createElement('div');
+      summary.className = 'task-summary';
+      const description = document.createElement('span');
+      const source = document.createElement('span');
+      source.className = 'task-source';
+      const state = document.createElement('span');
+      state.className = 'task-state';
+      summary.append(description, source, state);
+      const metadata = document.createElement('div');
+      metadata.className = 'task-meta';
+      const metadataText = document.createElement('span');
+      const meter = document.createElement('progress');
+      meter.className = 'task-progress';
+      meter.setAttribute('aria-label', '片段识别进度');
+      meter.hidden = true;
+      metadata.append(metadataText, meter);
+      info.append(summary, metadata);
+      const view = document.createElement('button');
+      view.type = 'button';
+      view.className = 'secondary';
+      view.addEventListener('click', () => showResult(taskId, view, view.dataset.filename));
+      view.dataset.filename = filename;
+      row.append(info, view);
+      return {row, description, source, state, metadata, metadataText, meter, view};
+    }
+
+    function updateTaskRows(tasks) {
+      const list = el('tasks');
+      const focused = document.activeElement;
+      const hadFocus = list.contains(focused);
+      const ids = new Set(tasks.map(task => task.task_id));
+      for (const [taskId, item] of taskRows) {
+        if (ids.has(taskId)) continue;
+        item.row.remove();
+        taskRows.delete(taskId);
+      }
+      let nextRow = list.firstElementChild;
+      for (const task of tasks) {
+        const name = task.filename || '录音';
+        const filename = (name.replace(/\.[^.]+$/, '') || '转写结果') + '.txt';
+        if (!taskRows.has(task.task_id)) taskRows.set(task.task_id, makeTaskRow(task.task_id, filename));
+        const {row, description, source, state, metadata, metadataText, meter, view} = taskRows.get(task.task_id);
+        view.dataset.filename = filename;
+        if (description.textContent !== name) description.textContent = name;
+        if (source.dataset.source !== task.source) {
+          source.dataset.source = task.source;
+          source.textContent = sourceLabels[task.source] || '';
+          source.hidden = !source.textContent;
+        }
+        const label = statuses[task.state] || task.state;
+        if (state.textContent !== label) state.textContent = label;
+        state.dataset.state = task.state;
+        const submitted = Number.isFinite(task.created) ? displayDate(new Date(task.created * 1000)) : '';
+        const progress = task.state === 'running' ? task.progress : null;
+        const measured = progress?.stage === 'recognizing' && Number.isInteger(progress.completed)
+          && Number.isInteger(progress.total) && progress.total > 0;
+        const phase = measured ? `识别片段 ${progress.completed}/${progress.total}` : progressLabels[progress?.stage];
+        const details = [task.api_owner, submitted, phase].filter(Boolean).join(' · ');
+        if (metadataText.textContent !== details) metadataText.textContent = details;
+        metadata.hidden = !details;
+        meter.hidden = !measured;
+        if (measured) {
+          meter.max = progress.total;
+          meter.value = progress.completed;
+        }
+        view.hidden = !task.can_view_result || (task.state !== 'done' && task.state !== 'failed');
+        const action = task.state === 'done' ? '查看结果' : '查看原因';
+        if (!view.hidden && view.textContent !== action) view.textContent = action;
+        if (row !== nextRow) list.insertBefore(row, nextRow);
+        nextRow = row.nextElementSibling;
+      }
+      if (hadFocus && focused !== document.activeElement) {
+        (focused.isConnected && !focused.hidden ? focused : el('refresh')).focus({preventScroll:true});
+      }
+      el('empty').textContent = tasks.length ? '' : '暂无任务';
+      if (selected && !ids.has(selected.task_id)) closeResult(false);
+    }
+
+    function updateQueue(queue) {
+      const worker = el('worker');
+      worker.textContent = queue ? (queue.online ? '在线' : '离线') : '未知';
+      worker.dataset.online = queue ? String(queue.online) : '';
+      el('activity').textContent = queue?.online ? (queue.busy ? '转写中' : '空闲') : '—';
+      el('queued-count').textContent = queue?.waiting ?? '—';
+    }
+
+    async function loadStatus() {
+      try {
+        const status = await api(endpoint + '/status');
+        updateQueue(status.queue);
+        limit = status.max_upload_bytes;
+        el('limits').textContent = '支持 MP3 和 WAV，最大 ' + (limit / 1048576) + ' MiB';
+        el('status-error').textContent = '';
+        const hours = status.result_retention_seconds / 3600;
+        el('retention').textContent = '结果保留 ' + hours + ' 小时';
+        updateTaskRows(status.tasks);
+        return status.queue?.busy || status.queue?.waiting > 0
+          || status.tasks.some(task => task.state === 'queued' || task.state === 'running');
+      } catch (error) {
+        updateQueue(null);
+        if (!taskRows.size) el('empty').textContent = '';
+        el('status-error').textContent = error.message;
+        return false;
+      }
+    }
+
+    form.elements.namedItem('audio').addEventListener('change', () => {
+      uploadRequestId = null;
+      el('notice').textContent = '';
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      const file = form.elements.namedItem('audio').files[0];
+      if (!file) return;
+      const type = /\.mp3$/i.test(file.name) ? 'audio/mpeg' : /\.wav$/i.test(file.name) ? 'audio/wav' : null;
+      if (!type || !file.size || (limit && file.size > limit)) {
+        el('notice').textContent = '请选择符合大小限制的 MP3 或 WAV 文件。';
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = '上传中…';
+      el('notice').textContent = '正在上传…';
+      try {
+        uploadRequestId ||= crypto.randomUUID();
+        const payload = new FormData(form);
+        payload.set('request_id', uploadRequestId);
+        await api(endpoint, {method:'POST', body:payload});
+        uploadRequestId = null;
+        el('upload-status').textContent = '已提交';
+        el('notice').textContent = '';
+        uploadDialog.close();
+        form.reset();
+        if (refreshing) await refreshing;
+        await refresh();
+      } catch (error) {
+        el('notice').textContent = '提交失败：' + error.message;
+      } finally {
+        submit.disabled = false;
+        submit.textContent = '开始转写';
+      }
+    });
+    el('download').addEventListener('click', () => {
+      if (!selected) return;
+      const source = URL.createObjectURL(new Blob([selected.text], {type:'text/plain;charset=utf-8'}));
+      const link = document.createElement('a');
+      link.href = source; link.download = selected.filename; link.click();
+      setTimeout(() => URL.revokeObjectURL(source), 1000);
+    });
+    el('refresh').addEventListener('click', refresh);
+    el('new-task').addEventListener('click', () => {
+      el('upload-status').textContent = '';
+      uploadDialog.showModal();
+    });
+    el('close-upload').addEventListener('click', () => uploadDialog.close());
+    resultDialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeResult();
+    });
+    el('close-result').addEventListener('click', () => closeResult());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearTimeout(refreshTimer);
+      else refresh();
+    });
+    refreshVisible();
+    {
+    const button = document.getElementById('back-to-top');
+    const update = () => { button.hidden = window.scrollY < 240; };
+    window.addEventListener('scroll', update, {passive:true});
+    window.addEventListener('pageshow', update);
+    button.addEventListener('click', () => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({top:0, behavior:reduced ? 'instant' : 'smooth'});
+    });
+    update();
+  }
+</script>
+  {% endif %}
+  {% include "celebration.html" %}
+</body>
+</html>

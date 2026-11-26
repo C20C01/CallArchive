@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}移除话单 · CallArchive{% endblock %}
+{% block layout %}narrow{% endblock %}
+{% block content %}
+  {% set suffix = "?all_owners=1" if all_owners else "" %}
+  {% set path = "/workbench/recordings/" ~ item.recording_id %}
+  <a class="back" href="{{ detail_url }}">返回话单</a>
+  <form class="panel form" action="{{ path }}/remove{{ suffix }}" method="post" aria-labelledby="remove">
+    <h1 id="remove">移除话单</h1>
+    <p>移除后停止后续归档。可在话单详情恢复。</p>
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <input type="hidden" name="confirm" value="yes">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button class="danger" type="submit">确认移除</button>
+  </form>
+{% endblock %}

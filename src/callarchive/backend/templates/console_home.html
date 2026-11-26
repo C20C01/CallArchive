@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>录音转写与归档</title>
+  <style nonce="{{ nonce }}">{{ console_css | safe }}</style>
+  <style nonce="{{ nonce }}">
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .home { margin-inline: auto; }
+    .home .console-header .role {
+      margin: 0; padding: 5px 10px; border: 1px solid var(--line);
+      border-radius: 99px; background: var(--surface); font-size: .85rem;
+    }
+    .home h2 { margin: 0; font-size: 1.15rem; }
+    .overview {
+      margin-block-end: 24px; padding: clamp(14px, 3vw, 22px);
+      border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+    }
+    .overview-header {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px 16px; margin-block-end: 14px;
+    }
+    .refresh-link {
+      display: inline-flex; align-items: center; min-block-size: 36px; padding-inline: 9px;
+      color: var(--accent); border: 1px solid var(--line); border-radius: 7px;
+      font-size: .85rem; text-decoration: none;
+    }
+    .refresh-link:hover { background: var(--wash); }
+    .overview-metrics {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
+      gap: 10px; margin: 0;
+    }
+    .overview-metrics > div { padding: 11px 13px; border-radius: 8px; background: #f3f7f7; }
+    .overview-metrics dt, .overview-metrics small { color: var(--muted); font-size: .83rem; }
+    .overview-metrics dd {
+      margin: 5px 0 0; font-weight: 650; font-size: .95rem;
+      font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+    }
+    .overview-metrics small { display: block; margin-block-start: 3px; font-weight: 400; }
+    .overview-metrics small:empty { display: none; }
+    .overview-metrics [data-worker="online"] { color: var(--accent); }
+    .overview-metrics [data-worker="unknown"] { color: #854d0e; }
+    .followup-section { border-block-start: 1px solid var(--line); margin-block-start: 16px; padding-block-start: 14px; }
+    .followup-section h3 { margin: 0 0 10px; font-size: .95rem; }
+    .followups, .home-links {
+      list-style: none; padding: 0; margin: 0; display: grid; gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    }
+    .followups a, .home .home-links a {
+      position: relative; display: flex; align-items: center; gap: 8px;
+      min-block-size: 44px; border: 1px solid var(--line);
+      border-radius: 9px; text-decoration: none; color: var(--ink);
+    }
+    .followups a { justify-content: space-between; padding: 8px 12px; background: #fcfefe; }
+    .followups a:hover, .home .home-links a:hover { border-color: var(--accent); background: var(--wash); }
+    .followups strong {
+      padding: 3px 8px; border-radius: 6px; background: #e8f3f1;
+      color: var(--accent); font-size: .9rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .followups a[data-kind="followup"] strong { color: #674a0a; background: #fff3d9; }
+    .followups a[data-kind="attention"] strong { color: #8c3338; background: #fcebed; }
+    .home h2.feature-title { margin-block-end: 10px; }
+    .home .home-links a {
+      align-items: start; flex-direction: column; gap: 4px; block-size: 100%;
+      padding: 14px 30px 14px 14px; background: var(--surface);
+    }
+    .home-links a::after {
+      content: ""; position: absolute; inset: 19px 15px auto auto;
+      inline-size: 6px; block-size: 6px; rotate: -45deg;
+      border-inline-end: 1.5px solid var(--muted); border-block-end: 1.5px solid var(--muted);
+    }
+    .home-links strong { font-size: 1rem; }
+    .home .home-links span { font-size: .85rem; line-height: 1.5; }
+    @media (max-width: 34rem) {
+      .overview-metrics { grid-template-columns: repeat(auto-fit, minmax(min(134px, 100%), 1fr)); }
+    }
+  </style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+  <main class="home{% if enter_from_login %} console-enter{% endif %}">
+    <header class="console-header">
+      <h1>录音转写与归档</h1>
+      <p class="role">当前角色 · {{ role_label }}</p>
+    </header>
+    {% if overview %}{% include "console_overview.html" %}{% endif %}
+    <nav aria-labelledby="feature-title">
+      <h2 class="feature-title" id="feature-title">功能入口</h2>
+      <ul class="home-links">
+        {% for url, title, description in links %}
+        <li><a href="{{ url }}"><strong>{{ title }}</strong><span>{{ description }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </main>
+  {% include "celebration.html" %}
+</body>
+</html>

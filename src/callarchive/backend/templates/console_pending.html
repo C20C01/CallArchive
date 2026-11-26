@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>待归档话单</title>
+  <style nonce="{{ nonce }}">{{ console_css | safe }}</style>
+  <style nonce="{{ nonce }}">
+    #back-to-top { position:fixed; right:16px; bottom:16px; z-index:2; width:40px; height:40px;
+      padding:0; border-radius:50%; background:#244b85; color:white; font-size:20px; cursor:pointer; }
+    #back-to-top[hidden] { display:none; }
+  </style>
+  <style nonce="{{ nonce }}">
+    * { box-sizing: border-box }
+    html { scrollbar-gutter: stable }
+    html:has(dialog:modal), body:has(dialog:modal) { overflow: hidden }
+    body { margin: 0; font-size: 15px; line-height: 1.55 }
+    main { margin: auto }
+    .panel { border: 1px solid var(--line); background: var(--surface); overflow: hidden }
+    .actions, .pager { display: flex; align-items: end; flex-wrap: wrap; gap: 12px }
+    .pager { padding: 16px 20px; justify-content: space-between; align-items: center }
+    #filters {
+      --date-step-width: 38px; --step-gap: 4px; --date-gap: 6px;
+      display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+      gap: 12px 16px; align-items: start; padding: 16px;
+    }
+    #filters label { display: grid; gap: 4px; min-width: 0; color: var(--muted);
+      font-size: .875rem; font-weight: 650 }
+    #filters label :is(input, select) { width: 100%; min-width: 0; font-size: 15px }
+    .date-filter { min-width: 0 }
+    .date-filter label { margin-bottom: 4px }
+    .filter-toolbar {
+      display: grid; grid-column: 1 / -1; grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center; gap: 8px;
+    }
+    .filter-toolbar .actions { flex-wrap: nowrap; justify-self: end }
+    #filters .filter-toolbar > button { inline-size: var(--filter-button-width) }
+    @media (min-width: 761px) {
+      .filter-toolbar .actions {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        inline-size: var(--call-action-group-width);
+      }
+    }
+    .filter-error { display: block; margin-block-start: 4px; color: #9a2732; font-size: .8rem }
+    #selection-count { color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums }
+    @media (max-width: 760px) {
+      #filters { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+    }
+    @media (max-width: 480px) {
+      .date-filter, #filters > label:last-of-type { grid-column: 1 / -1 }
+      .filter-toolbar { grid-template-columns: auto minmax(0, 1fr) }
+      #filters .filter-toolbar > button { padding-inline: 4px }
+      .filter-toolbar .actions { grid-column: 2; grid-row: 1 }
+      #selection-count { grid-column: 1 / -1; text-align: right }
+      #selection-count:empty { display: none }
+    }
+    .date-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--date-gap) }
+    .calendar-control { position: relative }
+    #call-date { width: 100%; padding-inline-end: 44px }
+    #open-calendar { position: absolute; inset-inline-end: 3px; top: 50%; transform: translateY(-50%);
+      display: grid; place-items: center; width: 34px; height: 34px; min-height: 0; padding: 0;
+      border: 0; background: transparent; color: var(--accent) }
+    #open-calendar:hover { background: var(--wash) }
+    #open-calendar:focus-visible { outline-offset: -2px }
+    .calendar-icon { position: relative; width: 17px; height: 16px; border: 1.5px solid currentColor; border-radius: 3px }
+    .calendar-icon::before { content: ""; position: absolute; inset: 4px 0 auto; border-top: 1.5px solid currentColor }
+    .calendar-icon::after { content: ""; position: absolute; inset: -4px 3px auto; height: 5px;
+      border-inline: 1.5px solid currentColor }
+    .date-steps { display: flex; gap: var(--step-gap) }
+    .date-step { width: var(--date-step-width); padding-inline: 8px; line-height: 1 }
+    #date-picker { position: absolute; width: 1px; height: 1px; min-height: 0; inset: auto 0 0 auto;
+      padding: 0; border: 0; opacity: 0; pointer-events: none }
+    button, input, select { padding: 8px 12px; border: 1px solid var(--line); color: inherit; background: white; font: inherit }
+    button { cursor: pointer; font-weight: 650 }
+    button.retry-button { color: #ad8700; border-color: rgb(173 135 0 / 28%); background: white }
+    button.retry-button:hover:not(:disabled) { background: rgb(173 135 0 / 6%) }
+    .retry-toast { position: fixed; inset: auto 24px 24px auto; z-index: 20; margin: 0;
+      max-width: min(420px, calc(100vw - 48px)); padding: 12px 16px; border: 1px solid var(--line);
+      border-radius: 10px; background: white; color: var(--ink, #173b3b); box-shadow: 0 4px 18px #173b3b20;
+      font-size: 14px; line-height: 1.6 }
+    .retry-toast.error { border-color: #e0b8bd; color: #9a2732 }
+    .row-actions { display: grid; grid-template-columns: repeat(3, var(--call-action-width)); gap: var(--call-action-gap); justify-content: start }
+    #detail .detail-header button {
+      inline-size: var(--call-action-width); padding-inline: 4px }
+    .action-cell { inline-size: calc(var(--call-action-group-width) + 32px); white-space: nowrap }
+    .call-select { width: 1%; padding-inline: 12px 4px }
+    .call-select input { width: 16px; height: 16px; min-height: 0; margin: 0; vertical-align: middle;
+      accent-color: var(--accent) }
+    button.danger { color: #9a2732; border-color: #e0b8bd }
+    button.danger:hover:not(:disabled) { background: #fff0f1 }
+    button.call-action:disabled, #remove-selected:disabled { cursor: not-allowed }
+    .table-wrap { overflow: auto; border-block: 1px solid var(--line); border-radius: 0 }
+    table { width: 100%; border-collapse: collapse; text-align: left }
+    th, td { padding: 10px 16px; vertical-align: middle }
+    th { background: #eff5f5; white-space: nowrap }
+    td { overflow-wrap: anywhere }
+    tbody tr + tr { border-top: 1px solid var(--line) }
+    button.phone-link { min-height: auto; padding: 3px 5px; margin: -3px -5px; border: 0;
+      background: transparent; text-decoration: underline; text-underline-offset: 3px;
+      text-decoration-color: var(--line); font-weight: inherit; font-variant-numeric: tabular-nums }
+    button.phone-link.phone-match { background: #fff0ca; color: #664508; text-decoration-color: currentColor }
+    time { font-variant-numeric: tabular-nums }
+    .badge { display: inline-block; background: #edf2f5; border-radius: 6px; padding: 2px 7px; font-weight: 650 }
+    .status-heading { display: inline-flex; align-items: center; gap: 3px }
+    .status-help { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px;
+      vertical-align: middle; cursor: help; color: var(--muted, #465773) }
+    .status-help-icon { display: grid; place-items: center; width: 13px; height: 13px; border: 1px solid currentColor;
+      border-radius: 50%; font-size: 11px; line-height: 1 }
+    .status-help-tip { position: fixed; z-index: 6; width: max-content; pointer-events: none;
+      max-width: 180px; white-space: normal; padding: 6px 9px; border-radius: 5px;
+      background: #24354b; color: white; font-size: 12px; font-weight: normal }
+    .call-duration { white-space: nowrap; font-variant-numeric: tabular-nums }
+    .call-duration.is-short { color: #cc2001 }
+    .call-duration.is-unknown { color: #6b7280 }
+    .duration-placeholder { display: inline-grid; grid-template-columns: repeat(2, 1ch) auto repeat(2, 1ch); text-align: center }
+    .operations-help-tip { max-width: min(280px, 75vw); text-align: left; line-height: 1.6 }
+    .operations-help-tip > span { display: block }
+    .operations-help-tip > span + span { margin-top: 7px }
+    .badge[title]:not([title=""]) { cursor: help }
+    .badge[data-state="archived"] { color: #07534b; background: #e0f3ea }
+    .badge[data-state="attention"], .badge[data-state="waiting_applicant"] { color: #754b08; background: #fff2d8 }
+    .badge[data-state="recording_invalid"] { color: #a32c2c; background: #fdeaea }
+    #message, #detail-message { margin: 0; color: var(--muted) }
+    dialog { overscroll-behavior: contain; width: min(780px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0;
+      color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 60px #13283a35 }
+    dialog::backdrop { background: #14253688 }
+    .detail-header { position: sticky; top: 0; padding: 16px 20px; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px; background: white; border-bottom: 1px solid var(--line) }
+    .detail-header h2, h3 { margin: 0 }
+    .detail-body { padding: 16px 20px 24px }
+    #remove-dialog { width: min(420px, calc(100% - 24px)) }
+    #remove-error { color: #9a2732 }
+    #remove-error:empty { display: none }
+    dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%,185px),1fr)); gap: 12px 18px; margin: 0 0 16px }
+    dt { font-size: .87rem; color: var(--muted) }
+    dd { margin: 2px 0 0; overflow-wrap: anywhere }
+    .recording { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 12px 0 0 }
+    .recording h3 { font-size: 1rem; margin-bottom: 8px; overflow-wrap: anywhere }
+    .recording-player { padding: 5px 10px; margin-bottom: 14px; border-radius: 8px; background: var(--wash) }
+    .recording-player-title { display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center; gap: 10px }
+    .recording-player-title h3 { margin: 0 }
+    .recording-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 16px;
+      margin: 4px 0 0 }
+    .recording-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      flex: 1 1 165px; align-items: center; gap: 8px }
+    .recording-controls input { width: 100%; min-width: 0; min-height: 24px; margin: 0; padding: 0;
+      accent-color: var(--accent) }
+    .recording-controls span { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
+    .recording-volume { display: grid; grid-template-columns: auto minmax(0, 1fr);
+      flex: 0 1 100px; align-items: center; gap: 6px; font-weight: 400 }
+    .recording-player .playback-error { color: #9a2732; margin-top: 6px; font-size: .88rem }
+    .recording p { margin: 0; color: var(--muted) }
+    .targets { overflow: auto; border: 1px solid var(--line); border-radius: 6px }
+    .targets th, .targets td { padding: 6px 9px }
+    @media (max-width: 700px) {
+      #filters, .pager { padding: 12px }
+      .call-table { min-width: 545px }
+      .detail-header, .detail-body { padding-inline: 12px }
+    }
+  </style>
+  {% include "console_arrival.html" %}
+</head>
+<body>
+<main{% if enter_from_login %} class="console-enter"{% endif %}>
+  <header class="console-header">
+    <h1>待归档话单</h1>
+    <a class="return-home" href="/">返回主页</a>
+  </header>
+  <section class="panel" aria-label="话单查询">
+    <form id="filters" data-initial-status="{{ initial_status }}">
+      <div class="date-filter">
+        <label for="call-date">拨打日期</label>
+        <div class="date-controls">
+          <div class="calendar-control">
+            <input id="call-date" name="date" type="text" placeholder="yyyy/mm/dd" maxlength="10" autocomplete="off">
+            <button id="open-calendar" type="button" class="secondary" aria-label="选择拨打日期"><span class="calendar-icon" aria-hidden="true"></span></button>
+            <input id="date-picker" type="date" tabindex="-1" aria-hidden="true">
+          </div>
+          <div class="date-steps" role="group" aria-label="切换日期">
+            <button id="previous-day" type="button" class="secondary date-step" aria-label="前一天">‹</button>
+            <button id="next-day" type="button" class="secondary date-step" aria-label="后一天">›</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label>被叫<input name="mobile" type="tel" pattern="\+?[0-9]{1,20}" maxlength="21" autocomplete="off"></label>
+        <span id="mobile-filter-error" class="filter-error" hidden>请输入有效的被叫号码，可在开头加 +。</span>
+      </div>
+      <label>跟进人<input name="salesperson" placeholder="姓名或主叫号码" maxlength="100"></label>
+      <label>归档状态<select name="status"><option value="">全部状态</option></select></label>
+      <div class="filter-toolbar">
+        <button id="remove-selected" type="button" class="danger" disabled>移除所选</button>
+        <span id="selection-count" role="status"></span>
+        <div class="actions search-actions"><button type="submit">查询</button><button id="clear" type="button" class="secondary">清空筛选</button></div>
+      </div>
+    </form>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="话单列表">
+      <table class="call-table">
+        <thead><tr><th scope="col" class="call-select"><input id="select-page" type="checkbox" aria-label="全选当前页" disabled></th>
+          <th scope="col">拨打时间</th><th scope="col">时长</th><th scope="col">被叫</th><th scope="col">跟进人</th><th scope="col"><span class="status-heading">归档状态<span class="status-help" tabindex="0" aria-describedby="status-help-tip"><span class="status-help-icon" aria-label="说明">?</span><span class="status-help-tip" id="status-help-tip" role="tooltip" hidden>将鼠标移到状态标签上，即可查看说明。</span></span></span></th><th scope="col" class="action-cell"><span class="status-heading">操作<span class="status-help" tabindex="0" aria-describedby="operations-help-tip"><span class="status-help-icon" aria-label="操作说明">?</span><span class="status-help-tip operations-help-tip" id="operations-help-tip" role="tooltip" hidden><span><strong>详情</strong>：查看处理状态，试听或下载录音。</span><span><strong>重试</strong>：再次处理这通话单，系统也会自动重试。</span><span><strong>移除</strong>：停止处理，删除本地录音、文本和记录；已上传到招聘系统的附件仍可查看。</span></span></span></span></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <p id="message" role="status"></p>
+      <div class="actions"><button id="previous" type="button" class="secondary" disabled>上一页</button><button id="next" type="button" class="secondary" disabled>下一页</button></div>
+    </div>
+  </section>
+</main>
+{% include "console_pending_detail.html" %}
+<dialog closedby="any" id="remove-dialog" aria-labelledby="remove-title">
+  <header class="detail-header"><h2 id="remove-title">移除这通话单？</h2></header>
+  <div class="detail-body">
+    <p id="remove-selection"></p>
+    <p>移除后将停止归档，并清理本地话单和附件。已上传到招聘系统的附件仍可查看。</p>
+    <p id="remove-error" role="alert"></p>
+    <div class="actions">
+      <button id="cancel-remove" type="button" class="secondary" autofocus>取消</button>
+      <button id="confirm-remove" type="button" class="danger">确认移除</button>
+    </div>
+  </div>
+</dialog>
+<button type="button" id="back-to-top" aria-label="回到顶部" title="回到顶部" hidden>↑</button>
+<script nonce="{{ nonce }}">
+  const csrf = {{ csrf | tojson }};
+  const byId = id => document.getElementById(id);
+  const filters = byId('filters');
+  const callDate = byId('call-date');
+  const datePicker = byId('date-picker');
+  const statusHelp = {
+    "waiting_recording": "已收到话单，录音尚未上传。系统会定时补查。",
+    "waiting_download": "已收到录音信息，录音尚未下载完成。",
+    "recording_invalid": "录音无法使用，已暂停归档。可重试获取录音，仍异常请联系管理员。",
+    "waiting_match": "录音已下载，等待按被叫号码查询应聘档案。",
+    "waiting_applicant": "未找到该被叫号码对应的可归档应聘档案。补录后，系统会自动复查。",
+    "processing": "录音正在等待或进行转写、上传，尚未完成归档。",
+    "attention": "录音、查档、转写或上传环节出现异常，或处理结果待核对。可打开详情查看。",
+    "archived": "本通话的录音和转写文本已归档。"
+  };
+  const dialog = byId('detail');
+  const removeDetail = byId('remove-detail');
+  const retryDetail = byId('retry-detail');
+  const removeDialog = byId('remove-dialog');
+  const size = 30;
+  let applied = new URLSearchParams(filters.dataset.initialStatus ? {status: filters.dataset.initialStatus} : {});
+  const linkedFilters = new URLSearchParams(location.search);
+  const linkedMobile = linkedFilters.get('mobile');
+  if (linkedMobile && /^\+?[0-9]{1,20}$/.test(linkedMobile)) {
+    applied.set('mobile', linkedMobile);
+    filters.elements.mobile.value = linkedMobile;
+  }
+  const linkedOwner = linkedFilters.get('owner');
+  if (linkedOwner && linkedOwner.length <= 100) {
+    applied.set('owner', linkedOwner);
+    filters.elements.salesperson.value = linkedOwner;
+  }
+  let offset = 0;
+  let nextOffset = null;
+  let listRequest;
+  let detailRequest;
+  let detailCall;
+  let selectedForRemoval;
+  let removing = false;
+  const pageSelection = new Map();
+  const selectPage = byId('select-page');
+  const removeSelected = byId('remove-selected');
+  const callRows = byId('rows');
+  const statusFilter = filters.elements.status;
+  const mobileFilter = filters.elements.mobile;
+  const mobileError = byId('mobile-filter-error');
+
+  for (const trigger of document.querySelectorAll('.status-help')) {
+    const tip = byId(trigger.getAttribute('aria-describedby'));
+    const position = () => {
+      if (tip.hidden) return;
+      const anchor = trigger.getBoundingClientRect();
+      tip.style.left = `${Math.max(8, Math.min(anchor.right - tip.offsetWidth, document.documentElement.clientWidth - tip.offsetWidth - 8))}px`;
+      const top = anchor.bottom + tip.offsetHeight <= innerHeight - 8 ? anchor.bottom : anchor.top - tip.offsetHeight;
+      tip.style.top = `${Math.max(8, top)}px`;
+    };
+    const show = () => { tip.hidden = false; position(); };
+    const hide = () => { tip.hidden = true; };
+    trigger.addEventListener('pointerenter', show);
+    trigger.addEventListener('focus', show);
+    trigger.addEventListener('pointerleave', () => { if (document.activeElement !== trigger) hide(); });
+    trigger.addEventListener('blur', () => { if (!trigger.matches(':hover')) hide(); });
+    trigger.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+    window.addEventListener('scroll', position, {capture: true, passive: true});
+    window.addEventListener('resize', position);
+  }
+
+  function element(tag, content) {
+    const node = document.createElement(tag);
+    if (content !== undefined) node.textContent = content;
+    return node;
+  }
+
+  function time(value) {
+    return value ? value.slice(0, 19).replace('T', ' ') : '—';
+  }
+
+  function facts(items) {
+    const list = element('dl');
+    for (const [label, value] of items) {
+      const cell = element('div');
+      cell.append(element('dt', label), element('dd', value ?? '—'));
+      list.append(cell);
+    }
+    return list;
+  }
+
+  async function requestJson(url, options) {
+    if (options?.method === 'POST') {
+      options = {...options, headers: {...options.headers, 'X-CallArchive-CSRF': csrf}};
+    }
+    const response = await fetch(url, {credentials: 'same-origin', ...options});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (typeof data.detail === 'string') throw new Error(data.detail);
+      throw new Error(response.status === 422 ? '请检查筛选条件。' : '查询失败，请稍后再试。');
+    }
+    return data;
+  }
+
+  function updateSelection() {
+    const count = [...pageSelection.values()].filter(check => check.checked).length;
+    selectPage.checked = count > 0 && count === pageSelection.size;
+    selectPage.indeterminate = count > 0 && !selectPage.checked;
+    selectPage.disabled = callRows.inert || !pageSelection.size;
+    removeSelected.disabled = !count;
+    byId('selection-count').textContent = count ? `已选 ${count} 通` : '';
+  }
+
+  function showRemoval(calls) {
+    selectedForRemoval = calls;
+    const call = calls[0];
+    byId('remove-title').textContent = calls.length === 1 ? '移除这通话单？' : '移除所选话单？';
+    byId('remove-selection').textContent = calls.length === 1
+      ? `${call.mobile || '号码未知'} · ${time(call.call_time)}`
+      : `已选中 ${calls.length} 通话单。`;
+    byId('remove-error').textContent = '';
+    removeDialog.showModal();
+  }
+
+  let retryToastTimer;
+  function retryFeedback(message, error = false) {
+    clearTimeout(retryToastTimer);
+    document.querySelector('.retry-toast')?.remove();
+    const toast = element('p', message);
+    toast.className = `retry-toast${error ? ' error' : ''}`;
+    toast.setAttribute('role', error ? 'alert' : 'status');
+    (dialog.open ? dialog : document.body).append(toast);
+    retryToastTimer = setTimeout(() => toast.remove(), error ? 8000 : 5000);
+  }
+
+  function renderRows(calls) {
+    pageSelection.clear();
+    const rows = callRows;
+    rows.replaceChildren();
+    const phones = new Map();
+    const callers = new Map();
+    for (const call of calls) {
+      const row = rows.insertRow();
+      const pick = row.insertCell();
+      pick.className = 'call-select';
+      if (call.can_remove) {
+        const check = element('input');
+        check.type = 'checkbox';
+        check.setAttribute('aria-label', `选择 ${call.mobile || '号码未知'} ${time(call.call_time)}`);
+        check.addEventListener('change', updateSelection);
+        pageSelection.set(call, check);
+        pick.append(check);
+      }
+      row.insertCell().textContent = time(call.call_time);
+      const duration = row.insertCell();
+      duration.className = 'call-duration';
+      const seconds = call.recording_seconds;
+      if (Number.isFinite(seconds) && seconds > 0) {
+        duration.textContent = recordingTime(seconds);
+        duration.classList.toggle('is-short', seconds < 120);
+      } else {
+        const placeholder = element('span');
+        placeholder.className = 'duration-placeholder';
+        placeholder.setAttribute('aria-hidden', 'true');
+        for (const character of '--:--') placeholder.append(element('span', character));
+        duration.append(placeholder);
+        duration.classList.add('is-unknown');
+        duration.setAttribute('aria-label', '时长未知');
+      }
+      const phoneCell = row.insertCell();
+      if (call.mobile && /^\+?[0-9]{1,20}$/.test(call.mobile)) {
+        const phone = element('button', call.mobile);
+        phone.type = 'button';
+        phone.className = 'secondary phone-link';
+        if (!phones.has(call.mobile)) phones.set(call.mobile, []);
+        const matchingPhones = phones.get(call.mobile);
+        matchingPhones.push(phone);
+        const highlight = active => matchingPhones.forEach(button => button.classList.toggle('phone-match', active));
+        phone.addEventListener('pointerenter', () => highlight(true));
+        phone.addEventListener('pointerleave', () => highlight(false));
+        phone.addEventListener('focus', () => { if (phone.matches(':focus-visible')) highlight(true); });
+        phone.addEventListener('blur', () => highlight(false));
+        phone.addEventListener('click', () => {
+          filters.elements.mobile.value = call.mobile;
+          filters.elements.mobile.focus();
+          filters.requestSubmit();
+        });
+        phoneCell.append(phone);
+      } else {
+        phoneCell.textContent = call.mobile || '—';
+      }
+      const callerCell = row.insertCell();
+      if (call.caller) {
+        const caller = element('button', call.salesperson);
+        caller.type = 'button';
+        caller.className = 'secondary phone-link';
+        const named = call.has_salesperson_name;
+        const key = named ? `owner:${call.salesperson}` : `caller:${call.caller}`;
+        caller.title = named ? `查询 ${call.salesperson} 的全部待归档话单` : `按主叫号码 ${call.caller} 搜索`;
+        if (!callers.has(key)) callers.set(key, []);
+        const matchingCallers = callers.get(key);
+        matchingCallers.push(caller);
+        const highlight = active => matchingCallers.forEach(button => button.classList.toggle('phone-match', active));
+        caller.addEventListener('pointerenter', () => highlight(true));
+        caller.addEventListener('pointerleave', () => highlight(false));
+        caller.addEventListener('focus', () => { if (caller.matches(':focus-visible')) highlight(true); });
+        caller.addEventListener('blur', () => highlight(false));
+        caller.addEventListener('click', () => {
+          if (named) {
+            filters.reset();
+            filters.elements.date.setCustomValidity('');
+            filters.elements.salesperson.value = call.salesperson;
+            filters.elements.salesperson.focus();
+            search(new URLSearchParams({owner: call.salesperson}), 0);
+            return;
+          }
+          filters.elements.salesperson.value = call.caller;
+          filters.elements.salesperson.focus();
+          filters.requestSubmit();
+        });
+        callerCell.append(caller);
+      } else {
+        callerCell.textContent = call.salesperson;
+      }
+      const state = element('span', call.status_label);
+      state.className = 'badge';
+      state.dataset.state = call.status;
+      state.title = statusHelp[call.status] || '';
+      row.insertCell().append(state);
+      const button = element('button', '详情');
+      button.className = 'secondary call-action';
+      button.type = 'button';
+      button.addEventListener('click', () => showDetail(call.talk_id));
+      const cell = row.insertCell();
+      cell.className = 'action-cell';
+      const actions = element('div');
+      actions.className = 'row-actions';
+      actions.append(button);
+      const retry = element('button', '重试');
+      retry.className = 'secondary retry-button call-action';
+      retry.type = 'button';
+      retry.disabled = !call.can_retry;
+      if (call.can_retry) {
+        retry.addEventListener('click', async () => {
+          retry.disabled = true;
+          retry.textContent = '提交中…';
+          try {
+            const result = await requestJson(`/api/calls/${encodeURIComponent(call.talk_id)}/retry`, {method: 'POST'});
+            await search(applied, offset);
+            retryFeedback(result.message || '已重新排队，后台将继续处理。');
+          } catch (error) {
+            retryFeedback(`重试失败：${error.message}`, true);
+            retry.disabled = false;
+            retry.textContent = '重试';
+          }
+        });
+      }
+      actions.append(retry);
+      if (call.can_remove) {
+        const remove = element('button', '移除');
+        remove.type = 'button';
+        remove.className = 'danger call-action';
+        remove.addEventListener('click', () => showRemoval([call]));
+        actions.append(remove);
+      }
+      cell.append(actions);
+    }
+  }
+
+  async function search(criteria, start, notice = '') {
+    listRequest?.abort();
+    const request = listRequest = new AbortController();
+    for (const check of pageSelection.values()) check.checked = false;
+    callRows.inert = true;
+    updateSelection();
+    byId('message').textContent = '查询中…';
+    byId('previous').disabled = byId('next').disabled = true;
+    try {
+      const params = new URLSearchParams(criteria);
+      params.set('limit', size);
+      let data;
+      do {
+        params.set('offset', start);
+        data = await requestJson(`/api/admin/calls?${params}`, {signal: request.signal});
+        if (data.calls.length || !start) break;
+        start = Math.max(0, start - size);
+      } while (!request.signal.aborted);
+      if (request.signal.aborted) return;
+      if (statusFilter.options.length === 1) {
+        for (const [code, label] of Object.entries(data.statuses)) {
+          if (code !== 'archived') statusFilter.add(new Option(label, code));
+        }
+      }
+      applied = criteria;
+      statusFilter.value = applied.get('status') || '';
+      offset = start;
+      nextOffset = data.next_offset;
+      renderRows(data.calls);
+      const summary = data.calls.length ? `第 ${offset / size + 1} 页 · 本页 ${data.calls.length} 通` : '没有符合条件的话单';
+      byId('message').textContent = notice + summary;
+    } catch (error) {
+      if (!request.signal.aborted) {
+        statusFilter.value = applied.get('status') || '';
+        byId('message').textContent = notice + error.message;
+      }
+    } finally {
+      if (!request.signal.aborted) {
+        callRows.inert = false;
+        updateSelection();
+        byId('previous').disabled = !offset;
+        byId('next').disabled = nextOffset === null;
+      }
+    }
+  }
+
+  function targetsTable(targets) {
+    const wrapper = element('div');
+    wrapper.className = 'targets';
+    const table = element('table');
+    const header = table.createTHead().insertRow();
+    for (const label of ['应聘记录 ID', '录音附件', '文本附件']) {
+      const cell = element('th', label);
+      cell.scope = 'col';
+      header.append(cell);
+    }
+    const rows = table.createTBody();
+    for (const record of targets) {
+      const row = rows.insertRow();
+      for (const value of [record.apply_id, record.audio, record.text]) row.insertCell().textContent = value;
+    }
+    wrapper.append(table);
+    return wrapper;
+  }
+
+  {% include "console_recording_controls.html" %}
+  function recordingPlayer(talkId, file) {
+    const endpoint = `/api/admin/calls/${encodeURIComponent(talkId)}/recording`;
+    const params = new URLSearchParams({file_id: file.file_id});
+    const panel = element('div');
+    panel.className = 'recording-player';
+    const header = element('div');
+    header.className = 'recording-player-title';
+    const toggle = element('button', '播放');
+    toggle.type = 'button';
+    toggle.className = 'secondary recording-toggle';
+    const download = element('a', '下载');
+    download.className = 'recording-download';
+    download.href = `${endpoint}?${params}`;
+    download.download = '';
+    download.setAttribute('aria-label', `下载 ${file.download_name}`);
+    header.append(element('h3', file.download_name), toggle, download);
+
+    const audio = element('audio');
+    audio.preload = 'none';
+    audio.hidden = true;
+    params.set('inline', 'true');
+    audio.src = `${endpoint}?${params}`;
+
+    return attachRecordingControls(panel, header, toggle, audio, dialog, file.download_name, element);
+  }
+
+  function renderDetail(data) {
+    const body = byId('detail-data');
+    const attributes = [
+      ['跟进人', data.salesperson], ['主叫号码', data.caller || '—'],
+      ['被叫', data.mobile || '—'], ['拨打时间', time(data.call_time)],
+      ['归档状态', data.status_label], ['来源', data.source], ['归档完成时间', time(data.closed_at)]
+    ];
+    if (data.bound_apply_id) attributes.push(['手动绑定的应聘记录', data.bound_apply_id]);
+    if (data.applicant_wait) {
+      attributes.push(['首次进入待补录', time(data.applicant_wait.started_at)], ['上次复查时段', time(data.applicant_wait.last_slot)]);
+    }
+    body.replaceChildren(facts(attributes));
+    if (!data.recordings.length) body.append(element('p', '当前没有录音明细。'));
+    for (const file of data.recordings) {
+      const section = element('section');
+      section.className = 'recording';
+      if (file.download_name) {
+        section.append(recordingPlayer(data.talk_id, file));
+      } else {
+        section.append(element('h3', file.name || '录音'));
+      }
+      const rows = [
+        ['录音 ID', file.file_id], ['下载状态', file.download], ['下载失败次数', file.download_attempts],
+        ['应聘档案查询', file.matching], ['转写状态', file.transcription], ['处理状态', file.worker_label],
+        ['归档尝试次数', file.worker_attempts], ['录音附件', file.audio], ['文本附件', file.text]
+      ];
+      if (file.failure) rows.push(['失败原因', file.failure]);
+      if (file.retry_after) rows.push(['可重试时间', time(file.retry_after)]);
+      section.append(facts(rows));
+      if (file.targets.length) section.append(targetsTable(file.targets));
+      body.append(section);
+    }
+  }
+
+  async function showDetail(identifier) {
+    detailRequest?.abort();
+    detailCall = null;
+    removeDetail.hidden = true;
+    retryDetail.disabled = true;
+    retryDetail.textContent = '重试';
+    const request = detailRequest = new AbortController();
+    byId('detail-message').textContent = '加载详情…';
+    byId('detail-data').replaceChildren();
+    if (!dialog.open) dialog.showModal();
+    try {
+      const data = await requestJson(`/api/admin/calls/${encodeURIComponent(identifier)}`, {signal: request.signal});
+      if (!request.signal.aborted) {
+        renderDetail(data);
+        detailCall = data;
+        removeDetail.hidden = !data.can_remove;
+        retryDetail.disabled = !data.can_retry;
+        byId('detail-message').textContent = '';
+      }
+    } catch (error) {
+      if (!request.signal.aborted) byId('detail-message').textContent = error.message;
+    }
+  }
+
+  async function confirmRemoval() {
+    if (removing || !selectedForRemoval) return;
+    removing = true;
+    const confirm = byId('confirm-remove');
+    const cancel = byId('cancel-remove');
+    confirm.disabled = cancel.disabled = true;
+    byId('remove-error').textContent = '';
+    try {
+      const talk_ids = selectedForRemoval.map(call => call.talk_id);
+      const result = await requestJson('/api/calls/remove', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({talk_ids})
+      });
+      if (!result.removed.length) {
+        byId('remove-error').textContent = result.failed[0].reason;
+        return;
+      }
+      removeDialog.close();
+      if (dialog.open && result.removed.includes(detailCall?.talk_id)) dialog.close();
+      let notice = `已移除 ${result.removed.length} 通。`;
+      if (result.failed.length) {
+        notice += `${result.failed.length} 通未移除（${result.failed[0].reason}）。`;
+      }
+      await search(applied, offset, notice);
+    } catch (error) {
+      byId('remove-error').textContent = error.message;
+    } finally {
+      removing = false;
+      confirm.disabled = cancel.disabled = false;
+    }
+  }
+
+  function parseCallDate(value) {
+    const iso = value.replaceAll('/', '-');
+    const parsed = new Date(`${iso}T00:00:00Z`);
+    if (!/^\d{4}\/\d{2}\/\d{2}$/.test(value) || iso.startsWith('0000') ||
+        Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) {
+      callDate.setCustomValidity('请输入有效日期，格式为 yyyy/mm/dd。');
+      callDate.reportValidity();
+      return null;
+    }
+    return parsed;
+  }
+
+  function today() {
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    const parts = Object.fromEntries(formatter.formatToParts().map(({type, value}) => [type, value]));
+    return `${parts.year}/${parts.month}/${parts.day}`;
+  }
+
+  function stepDate(days) {
+    const value = callDate.value.trim();
+    if (value) {
+      const selected = parseCallDate(value);
+      if (!selected) return;
+      selected.setUTCDate(selected.getUTCDate() + days);
+      if (selected.getUTCFullYear() < 1 || selected.getUTCFullYear() > 9999) return;
+      callDate.value = selected.toISOString().slice(0, 10).replaceAll('-', '/');
+    } else {
+      callDate.value = today();
+    }
+    callDate.setCustomValidity('');
+    filters.requestSubmit();
+  }
+
+  function criteriaFromForm() {
+    const criteria = new URLSearchParams();
+    for (const [name, value] of new FormData(filters)) if (value.trim()) criteria.set(name, value.trim());
+    if (applied.has('owner') && criteria.get('salesperson') === applied.get('owner')) {
+      criteria.delete('salesperson');
+      criteria.set('owner', applied.get('owner'));
+    }
+    if (criteria.has('date')) {
+      const selected = parseCallDate(criteria.get('date'));
+      if (!selected) return null;
+      criteria.set('date', selected.toISOString().slice(0, 10));
+    }
+    return criteria;
+  }
+
+  dialog.addEventListener('close', () => {
+    if (dialog.open) return;
+    detailRequest?.abort();
+    for (const player of dialog.querySelectorAll('audio')) player.pause();
+  });
+  retryDetail.addEventListener('click', async () => {
+    if (!detailCall?.can_retry || retryDetail.disabled) return;
+    const identifier = detailCall.talk_id;
+    retryDetail.disabled = true;
+    retryDetail.textContent = '提交中…';
+    try {
+      const result = await requestJson(`/api/calls/${encodeURIComponent(identifier)}/retry`, {method: 'POST'});
+      await search(applied, offset);
+      if (dialog.open && detailCall?.talk_id === identifier) {
+        await showDetail(identifier);
+        retryFeedback(result.message || '已重新排队，后台将继续处理。');
+      }
+    } catch (error) {
+      if (dialog.open && detailCall?.talk_id === identifier) retryFeedback(`重试失败：${error.message}`, true);
+    } finally {
+      if (detailCall?.talk_id === identifier) {
+        retryDetail.disabled = !detailCall.can_retry;
+        retryDetail.textContent = '重试';
+      }
+    }
+  });
+  removeDetail.addEventListener('click', () => {
+    if (detailCall?.can_remove) showRemoval([detailCall]);
+  });
+  removeDialog.addEventListener('cancel', event => { if (removing) event.preventDefault(); });
+  byId('cancel-remove').addEventListener('click', () => removeDialog.close());
+  byId('confirm-remove').addEventListener('click', confirmRemoval);
+  selectPage.addEventListener('change', () => {
+    for (const check of pageSelection.values()) check.checked = selectPage.checked;
+    updateSelection();
+  });
+  removeSelected.addEventListener('click', () => {
+    const calls = [...pageSelection].filter(([, check]) => check.checked).map(([call]) => call);
+    if (calls.length) showRemoval(calls);
+  });
+  callDate.addEventListener('input', () => callDate.setCustomValidity(''));
+  byId('previous-day').addEventListener('click', () => stepDate(-1));
+  byId('next-day').addEventListener('click', () => stepDate(1));
+  byId('open-calendar').hidden = typeof datePicker.showPicker !== 'function';
+  byId('open-calendar').addEventListener('click', () => {
+    datePicker.value = callDate.value.replaceAll('/', '-');
+    datePicker.showPicker();
+  });
+  datePicker.addEventListener('change', () => {
+    callDate.value = datePicker.value.replaceAll('-', '/');
+    callDate.setCustomValidity('');
+    filters.requestSubmit();
+  });
+  statusFilter.addEventListener('change', () => filters.requestSubmit());
+  filters.addEventListener('invalid', () => {
+    statusFilter.value = applied.get('status') || '';
+  }, true);
+  mobileFilter.addEventListener('invalid', event => {
+    event.preventDefault();
+    mobileError.hidden = false;
+    mobileFilter.setAttribute('aria-invalid', 'true');
+    mobileFilter.setAttribute('aria-describedby', mobileError.id);
+    mobileFilter.focus();
+  });
+  function clearMobileError() {
+    mobileError.hidden = true;
+    mobileFilter.removeAttribute('aria-invalid');
+    mobileFilter.removeAttribute('aria-describedby');
+  }
+  mobileFilter.addEventListener('input', clearMobileError);
+  filters.addEventListener('reset', clearMobileError);
+  filters.addEventListener('submit', event => {
+    event.preventDefault();
+    const criteria = criteriaFromForm();
+    if (criteria) search(criteria, 0);
+  });
+  byId('clear').addEventListener('click', () => {
+    filters.reset();
+    callDate.setCustomValidity('');
+    search(new URLSearchParams(), 0);
+  });
+  byId('previous').addEventListener('click', () => search(applied, Math.max(0, offset - size)));
+  byId('next').addEventListener('click', () => { if (nextOffset !== null) search(applied, nextOffset); });
+  search(applied, 0);
+  const linkedCall = linkedFilters.get('call');
+  if (linkedCall && /^[a-f0-9]{32}$/.test(linkedCall)) showDetail(linkedCall);
+  {
+    const button = document.getElementById('back-to-top');
+    const update = () => { button.hidden = window.scrollY < 240; };
+    window.addEventListener('scroll', update, {passive:true});
+    window.addEventListener('pageshow', update);
+    button.addEventListener('click', () => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({top:0, behavior:reduced ? 'instant' : 'smooth'});
+    });
+    update();
+  }
+</script>
+  {% include "celebration.html" %}
+</body>
+</html>

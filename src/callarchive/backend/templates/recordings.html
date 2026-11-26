@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}归档话单 · CallArchive{% endblock %}
+{% block scripts %}<script src="/workbench/details.js" defer></script>
+<script src="/workbench/bulk-remove.js" defer></script>
+<script src="/workbench/call-filters.js" defer></script>{% endblock %}
+{% block content %}
+  <header class="console-header page-heading">
+    <h1 id="recordings">{{ {"pending": "待归档话单", "archived": "近期归档"}.get(view, "归档话单") }}</h1>
+    <a class="quiet" href="/">返回</a>
+  </header>
+
+  <section class="panel call-panel" aria-labelledby="recordings">
+    <nav class="views" aria-label="话单视图">
+      {% for value, label in [("all", "全部话单"), ("pending", "待归档"), ("archived", "已归档")] %}
+        <a href="{{ list_url(view=value, status=none) }}"{% if view == value %} aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <form id="filters" class="call-filters" action="/workbench" method="get" aria-label="筛选话单">
+      <input type="hidden" name="view" value="{{ view }}">
+      {% if all_owners %}<input type="hidden" name="all_owners" value="1">{% endif %}
+      <div class="date-filter">
+        <label for="call-date">拨打日期</label>
+        <div class="date-controls">
+          <input id="call-date" type="date" name="day" value="{{ filters.day }}">
+          <button type="button" class="quiet date-step" data-day-step="-1" aria-label="前一天">‹</button>
+          <button type="button" class="quiet date-step" data-day-step="1" aria-label="后一天">›</button>
+        </div>
+      </div>
+      <label>手机号<input type="tel" name="mobile" value="{{ filters.mobile }}" maxlength="64"></label>
+      <label>跟进人<input name="assignee" value="{{ filters.assignee }}" placeholder="姓名或主叫号码" maxlength="128"></label>
+      {% if view != "archived" %}
+        <label>归档状态
+          <select name="status">
+            <option value="">全部状态</option>
+            {% for value, label in status_labels.items() if view == "all" or value not in ("archived", "removed") %}
+              <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      {% endif %}
+      <div class="actions">
+        <button type="submit">查询</button>
+        <a class="quiet" href="{{ list_url(day=none, mobile=none, assignee=none, status=none) }}">清空筛选</a>
+        <button id="remove-selected" class="quiet danger" type="button" aria-haspopup="dialog" disabled>移除所选</button>
+      </div>
+    </form>
+
+    {% if bulk == "removed" %}<p class="notice bulk-feedback" role="status">已移除所选话单。</p>
+    {% elif bulk == "unavailable" %}<p class="error bulk-feedback" role="status">有话单当前无法移除，本次未移除。请重新选择。</p>{% endif %}
+    {% if result["items"] %}
+      <div class="table-wrap" tabindex="0" role="region" aria-label="话单列表">
+        <table class="call-table" role="table">
+          <thead role="rowgroup"><tr role="row">
+            <th role="columnheader" scope="col" class="call-select">
+              <label class="select-label"><input id="select-page" type="checkbox" disabled aria-label="全选当前页"><span class="mobile-label" aria-hidden="true">全选当前页</span></label>
+            </th>
+            <th role="columnheader" scope="col">拨打时间</th><th role="columnheader" scope="col">时长</th><th role="columnheader" scope="col">被叫</th>
+            <th role="columnheader" scope="col">跟进人</th><th role="columnheader" scope="col">归档状态</th><th role="columnheader" scope="col" class="action-cell">操作</th>
+          </tr></thead>
+          <tbody role="rowgroup">
+            {% set suffix = "?all_owners=1" if all_owners else "" %}
+            {% for row in result["items"] %}
+              {% set call = row.call or {} %}
+              {% set path = "/workbench/recordings/" ~ row.recording_id %}
+              <tr role="row">
+                <td role="cell" class="call-select">
+                  <label class="select-label">
+                    <input type="checkbox" name="recording_ids" value="{{ row.recording_id }}" form="bulk-remove"{% if not row.can_remove %} disabled{% endif %}>
+                    <span class="sr-only">选择 {{ call.callee or row.recording_id[:8] }}</span>
+                  </label>
+                </td>
+                <td role="cell" class="call-time"><span class="mobile-label" aria-hidden="true">拨打时间</span>{% if call.started_at %}<time datetime="{{ call.started_at }}">{{ call.started_at|call_time }}</time>{% else %}—{% endif %}</td>
+                <td role="cell" class="duration{% if row.recording_duration_ms is not none and row.recording_duration_ms < 120000 %} short{% endif %}"><span class="mobile-label" aria-hidden="true">时长</span>{{ row.recording_duration_ms|duration }}</td>
+                <td role="cell"><span class="mobile-label" aria-hidden="true">被叫</span>{% if call.callee %}<a class="filter-link" data-filter-group="mobile" data-filter-value="{{ call.callee }}" href="{{ list_url(mobile=call.callee) }}">{{ call.callee }}</a>{% else %}—{% endif %}</td>
+                <td role="cell"><span class="mobile-label" aria-hidden="true">跟进人</span><a class="filter-link" data-filter-group="assignee" data-filter-value="{{ row.owner }}" href="{{ list_url(assignee=row.owner, day=none, mobile=none, status=none) }}">{{ row.owner }}</a></td>
+                <td role="cell"><span class="mobile-label" aria-hidden="true">归档状态</span><span class="state {{ row.status }}"{% if row.error %} title="{{ error_labels.get(row.error, row.error) }}"{% endif %}>{{ status_labels.get(row.status, row.status) }}</span></td>
+                <td role="cell" class="action-cell">
+                  <div class="row-actions">
+                    <a class="quiet action-detail" href="{{ list_url(cursor=cursor, recording=row.recording_id) }}" data-open-detail aria-haspopup="dialog">详情<span class="sr-only"> {{ call.callee or row.recording_id[:8] }}</span></a>
+                    {% if row.can_retry %}
+                      <form action="{{ path }}/retry{{ suffix }}" method="post">
+                        <input type="hidden" name="csrf" value="{{ session.csrf }}">
+                        <input type="hidden" name="back" value="{{ close_url }}">
+                        <button class="quiet action-retry" type="submit">重试<span class="sr-only"> {{ call.callee or row.recording_id[:8] }}</span></button>
+                      </form>
+                    {% else %}<button class="quiet" type="button" disabled>重试</button>{% endif %}
+                    {% if row.can_remove %}<a class="quiet danger" href="{{ path }}/remove?{{ {"back": close_url, "all_owners": 1 if all_owners else 0}|urlencode }}">移除<span class="sr-only"> {{ call.callee or row.recording_id[:8] }}</span></a>
+                    {% else %}<button class="quiet" type="button" disabled>移除</button>{% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}<p class="empty muted">暂无符合条件的话单。</p>{% endif %}
+
+    {% if cursor or result.next_cursor %}
+      <nav class="paging call-paging" aria-label="话单分页">
+        {% if cursor %}<a class="quiet" href="{{ list_url() }}">回到最新</a>{% endif %}
+        {% if result.next_cursor %}<a class="quiet" href="{{ list_url(cursor=result.next_cursor) }}">更早的话单</a>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+  <p id="detail-feedback" class="error" role="status" hidden></p>
+  {% if item %}{% include "recording.html" %}{% endif %}
+  <dialog id="remove-dialog" class="recording-dialog bulk-dialog" aria-labelledby="remove-title">
+    <header class="detail-header"><h2 id="remove-title">移除所选话单？</h2></header>
+    <form id="bulk-remove" class="detail-body" action="/workbench/bulk-remove{% if all_owners %}?all_owners=1{% endif %}" method="post">
+      <p>将移除选中的 <strong id="selected-count">0</strong> 通话单，可在详情中恢复。</p>
+      <input type="hidden" name="csrf" value="{{ session.csrf }}">
+      <input type="hidden" name="confirm" value="yes">
+      <input type="hidden" name="back" value="{{ close_url }}">
+      <div class="actions">
+        <button type="button" class="quiet" data-cancel-remove autofocus>取消</button>
+        <button type="submit" class="quiet danger">确认移除</button>
+      </div>
+    </form>
+  </dialog>
+{% endblock %}

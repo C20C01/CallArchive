@@ -1,0 +1,81 @@
+<dialog id="recording-detail" class="recording-dialog" aria-labelledby="detail-title" data-close-url="{{ close_url }}">
+  {% set suffix = "?all_owners=1" if all_owners else "" %}
+  {% set call = item.call or {} %}
+  <header class="detail-header">
+    <h2 id="detail-title">话单详情</h2>
+    <span class="state {{ item.status }}">{{ status_labels.get(item.status, item.status) }}</span>
+    <form method="dialog"><button type="submit" class="quiet" autofocus>关闭</button></form>
+  </header>
+  <div class="detail-body">
+  {% if retried %}<p class="notice" role="status">已安排重试。</p>{% endif %}
+  <section class="panel detail">
+    <dl class="facts">
+      <div><dt>被叫</dt><dd>{{ call.callee or "—" }}</dd></div>
+      <div><dt>主叫</dt><dd>{{ call.caller or "—" }}</dd></div>
+      <div><dt>拨打时间</dt><dd>{% if call.started_at %}<time datetime="{{ call.started_at }}">{{ call.started_at|call_time }}</time>{% else %}—{% endif %}</dd></div>
+      <div><dt>任务编号</dt><dd class="code">{{ item.recording_id }}</dd></div>
+    </dl>
+    {% if item.error %}<p class="error">{{ error_labels.get(item.error, item.error) }}</p>{% endif %}
+    <div class="media recording-media">
+      <audio controls preload="metadata" aria-label="通话录音" src="/workbench/recordings/{{ item.recording_id }}/audio{{ suffix }}"></audio>
+      {% if item.recording_duration_ms is not none %}<span class="duration">{{ item.recording_duration_ms|duration }}</span>{% endif %}
+      <a download href="/workbench/recordings/{{ item.recording_id }}/audio{{ suffix }}">下载录音</a>
+    </div>
+    <div class="actions">
+    {% if item.can_retry %}
+      <form action="/workbench/recordings/{{ item.recording_id }}/retry{{ suffix }}" method="post" aria-label="重试归档">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}">
+        <input type="hidden" name="back" value="{{ close_url }}">
+        <button type="submit" class="quiet action-retry">重试</button>
+      </form>
+    {% else %}<button class="quiet" type="button" disabled>重试</button>{% endif %}
+    {% if item.can_remove %}
+      <a class="quiet danger" href="/workbench/recordings/{{ item.recording_id }}/remove?{{ {"back": close_url, "all_owners": 1 if all_owners else 0}|urlencode }}">移除</a>
+    {% else %}<button class="quiet" type="button" disabled>移除</button>{% endif %}
+    {% if item.can_restore %}
+      <form action="/workbench/recordings/{{ item.recording_id }}/restore{{ suffix }}" method="post" aria-label="恢复话单">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}">
+        <input type="hidden" name="confirm" value="yes">
+        <input type="hidden" name="back" value="{{ close_url }}">
+        <button type="submit" class="quiet">恢复</button>
+      </form>
+    {% endif %}
+    </div>
+  </section>
+  {% if item.transcript %}
+    <section class="panel detail"><h2>转写结果</h2><p class="transcript">{{ item.transcript.text }}</p></section>
+  {% endif %}
+  {% if item.receipts %}
+    <section class="panel detail">
+      <h2>归档回执</h2>
+      <dl class="facts">{% for key, receipt in item.receipts.items() %}
+        {% if receipt is mapping %}
+          <div><dt>{{ key }}</dt><dd>
+            {% for kind, result in receipt.items() %}
+              <div>{{ {"audio": "录音", "transcript": "转写文本"}.get(kind, kind) }} ·
+                {{ {"confirmed": "已确认", "pending": "等待交付", "writing": "正在写入", "rejected": "明确失败", "unknown": "待核对"}.get(result.status, result.status) }}
+                {% if result.receipt %}<span class="code">{{ result.receipt }}</span>{% endif %}</div>
+            {% endfor %}
+          </dd></div>
+        {% else %}
+          <div><dt>{{ {"audio": "录音", "transcript": "转写文本"}.get(key, key) }}</dt><dd class="code">{{ receipt }}</dd></div>
+        {% endif %}
+      {% endfor %}</dl>
+    </section>
+  {% endif %}
+  <section class="panel detail">
+    <h2>流程日志</h2>
+    {% if events["items"] %}
+      <ol class="timeline">
+        {% for event in events["items"] %}
+          <li><time>{{ event.occurred_at|event_time }}</time><strong>{{ status_labels.get(event.status, event.status) }}</strong>
+            <span>{{ event.actor }}{% if event.error %} · {{ error_labels.get(event.error, event.error) }}{% endif %}</span></li>
+        {% endfor %}
+      </ol>
+    {% else %}<p class="muted">暂无流程日志。</p>{% endif %}
+    {% if events.next_cursor %}
+      <a href="{{ list_url(cursor=cursor, recording=item.recording_id, after=events.next_cursor) }}">更多日志</a>
+    {% endif %}
+  </section>
+  </div>
+</dialog>

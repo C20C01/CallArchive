@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}录音归档与转写 · CallArchive{% endblock %}
+{% block content %}
+    <header class="console-header">
+      <h1>录音归档与转写</h1>
+      {% if role_label %}<p>当前角色 · {{ role_label }}</p>{% endif %}
+    </header>
+        <nav aria-label="功能入口">
+      <ul class="home-links">
+        {% if can_archive %}
+          <li><a class="panel" href="/workbench?view=pending">待归档话单</a></li>
+          <li><a class="panel" href="/workbench?view=archived">近期归档</a></li>
+          <li><a class="panel" href="/workbench/upload">上传录音</a></li>
+        {% endif %}
+        {% if transcription_enabled %}<li><a class="panel" href="/workbench/transcription">转写工作台</a></li>{% endif %}
+        {% if is_admin and runtime_log_enabled %}<li><a class="panel" href="/workbench/operations">后台任务日志</a></li>{% endif %}
+      </ul>
+    </nav>
+  {% if not can_archive and not transcription_enabled %}<p class="muted">独立转写暂未启用。</p>{% endif %}
+{% endblock %}

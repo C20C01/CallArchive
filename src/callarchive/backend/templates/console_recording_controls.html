@@ -1,0 +1,87 @@
+  function recordingTime(seconds) {
+    const total = Math.floor(seconds);
+    const minutes = String(Math.floor(total / 60)).padStart(2, '0');
+    const remainder = String(total % 60).padStart(2, '0');
+    return `${minutes}:${remainder}`;
+  }
+
+  function attachRecordingControls(panel, header, toggle, audio, dialog, label, element) {
+    const controls = element('div');
+    controls.className = 'recording-controls';
+    controls.hidden = true;
+    const progress = element('div');
+    progress.className = 'recording-progress';
+    const seek = element('input');
+    seek.type = 'range';
+    seek.min = '0';
+    seek.step = 'any';
+    seek.value = '0';
+    seek.setAttribute('aria-label', '播放进度');
+    const times = element('span');
+    progress.append(seek, times);
+    const volumeLabel = element('label');
+    volumeLabel.className = 'recording-volume';
+    const volume = element('input');
+    volume.type = 'range';
+    volume.min = '0';
+    volume.max = '100';
+    volume.value = String(Math.round(audio.volume * 100));
+    volume.setAttribute('aria-valuetext', `${volume.value}%`);
+    volumeLabel.append(element('span', '音量'), volume);
+    volume.addEventListener('input', () => {
+      audio.volume = volume.valueAsNumber / 100;
+      audio.muted = volume.valueAsNumber === 0;
+      volume.setAttribute('aria-valuetext', `${volume.value}%`);
+    });
+    controls.append(progress, volumeLabel);
+    const error = element('p');
+    error.className = 'playback-error';
+    error.hidden = true;
+    error.setAttribute('role', 'status');
+    panel.append(header, controls, error, audio);
+
+    function updateToggle() {
+      const playing = !audio.paused && !audio.ended;
+      toggle.textContent = playing ? '暂停' : '播放';
+      toggle.setAttribute('aria-label', `${toggle.textContent} ${label}`);
+    }
+    function updateProgress() {
+      const duration = audio.duration;
+      const known = Number.isFinite(duration) && duration > 0;
+      seek.disabled = !known;
+      seek.max = known ? String(duration) : '0';
+      seek.value = String(audio.currentTime);
+      const elapsed = recordingTime(audio.currentTime);
+      const total = known ? recordingTime(duration) : '—';
+      times.textContent = `${elapsed} / ${total}`;
+      seek.setAttribute('aria-valuetext', `${elapsed} / ${total}`);
+    }
+    function showPlaybackError() {
+      error.hidden = false;
+      error.textContent = '录音无法播放，可以尝试下载。';
+      updateToggle();
+    }
+    for (const event of ['play', 'pause', 'ended']) audio.addEventListener(event, updateToggle);
+    for (const event of ['durationchange', 'timeupdate', 'seeked']) audio.addEventListener(event, updateProgress);
+    audio.addEventListener('error', showPlaybackError);
+    seek.addEventListener('input', () => { audio.currentTime = seek.valueAsNumber; });
+    toggle.addEventListener('click', async () => {
+      if (!audio.paused && !audio.ended) {
+        audio.pause();
+        return;
+      }
+      for (const other of dialog.querySelectorAll('audio')) if (other !== audio) other.pause();
+      controls.hidden = false;
+      error.hidden = true;
+      error.textContent = '';
+      if (audio.error) audio.load();
+      try {
+        await audio.play();
+      } catch (failure) {
+        if (failure.name !== 'AbortError') showPlaybackError();
+      }
+    });
+    updateToggle();
+    updateProgress();
+    return panel;
+  }
